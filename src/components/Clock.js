@@ -5,7 +5,7 @@ import { format12 } from '../scripts/SmartAzanClock'
 export default function Clock() {
 
     const { showMenu, setShowMenu, nextText, todaysDate, hijriDate, locationSettings,
-        calculationSettings, deviceSettings, hourAngle, vakits, arcVakits, displayTime, currentVakit, nextVakit, currentArcVakit,
+        deviceSettings, hourAngle, vakits, arcVakits, displayTime, currentVakit, nextVakit, currentArcVakit,
         elapsed, background, dim, clockOpacity, midnightAngle, oneThirdAngle, twoThirdAngle, alarmSettings, naflAlarmSettings, isWeekDay } = useContext(AppContext)
     const canvasRef = useRef(null)
     const driftRef = useRef(null)
@@ -48,11 +48,30 @@ export default function Clock() {
             setShowMenu(!showMenu)
         }
     }
-    const size = 1000; /* size = width = height */
+
     const black = '#0D0E0F';
-    const gray = '#4B4E54';
     const white = 'whitesmoke';
     const silver = 'silver';
+
+    // Prayer colors as requested
+    const prayerColors = {
+        fajr: '#0000FF',    // Blue
+        dhuhr: '#FFBF00',   // Amber
+        asr: '#008000',     // Green
+        maghrib: '#FFA500', // Orange
+        isha: '#000080',    // Navy
+        grey: '#808080'     // Grey for time between fajr and dhuhr
+    };
+
+    // Arabic prayer names
+    const arabicPrayerNames = {
+        fajr: 'الفجر',
+        dhuhr: 'الظهر',
+        asr: 'العصر',
+        maghrib: 'المغرب',
+        isha: 'العشاء',
+        grey: 'الgrey'
+    };
 
     useEffect(() => {
         const el = driftRef.current
@@ -62,7 +81,7 @@ export default function Clock() {
             document.body.style.backgroundPosition = '50% 50%'
             return
         }
-        const speed = 0.3 // pixels per frame
+        const speed = 0.3
         let x = 0, y = 0, dx = speed, dy = speed * 0.7
         const interval = setInterval(() => {
             const canvas = canvasRef.current
@@ -87,307 +106,405 @@ export default function Clock() {
     }, [deviceSettings.screenSaver, deviceSettings.zoomedIn])
 
     useEffect(() => {
-
-        const ctx = (canvasRef.current).getContext("2d")
-
-        updateBackground(background);
-
-        sac.clearCanvas(ctx)
-            .fillCircle(ctx, 490, 0, 0, white, 0.33)
-            .fillCircle(ctx, 488, 0, 0, black)
-            .drawNumbers24(ctx, 455, 13, white)
-            .drawArcs(ctx, 421, 41)
-            .drawHand(ctx, midnightAngle, 413, 443, 3.5, black)
-            .printAt(ctx, '1/2', 14, white, 403, midnightAngle)
-            .drawHand(ctx, oneThirdAngle, 413, 443, 3.5, black)
-            .printAt(ctx, '1/3', 14, white, 403, oneThirdAngle)
-            .drawHand(ctx, twoThirdAngle, 413, 443, 3.5, black)
-            .printAt(ctx, '2/3', 14, white, 403, twoThirdAngle)
-            .markAlarms(ctx, 391)
-            .drawArrow(ctx, hourAngle, 479, 41, 59, black)
-            .drawArrow(ctx, hourAngle, 479, 41, 56, white)
-            .drawCircle(ctx, 482, black, 9)
-            .print(ctx, displayTime, 250, white, -27)
-            .print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
-            .print(ctx, nextText, 156, white, 223)
-            .updateTitle(ctx, 'AzanClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)
-            .arcText(ctx, 'top', todaysDate, 45, 337, white)
-            .arcText(ctx, 'top', hijriDate, 39, 265, white)
-            .arcText(ctx, 'bottom', '#vakits#', 31, 377, white)
-
-        if (currentArcVakit.name != 'Duhaend')
-            sac.print(ctx, currentArcVakit.name, 37, white, -191);
-
+        const canvas = canvasRef.current
+        if (!canvas) return
+        
+        // Set canvas size to match display size
+        const rect = canvas.getBoundingClientRect()
+        canvas.width = rect.width
+        canvas.height = rect.height
+        
+        const ctx = canvas.getContext("2d")
+        updateBackground(background)
+        drawClock(ctx)
+        
+        // Add resize handler
+        const handleResize = () => {
+            const rect = canvas.getBoundingClientRect()
+            canvas.width = rect.width
+            canvas.height = rect.height
+            drawClock(ctx)
+        }
+        window.addEventListener('resize', handleResize)
+        
+        // Add animation loop for smooth rotation
+        let animationFrameId
+        const animate = () => {
+            drawClock(ctx)
+            animationFrameId = requestAnimationFrame(animate)
+        }
+        animate()
+        
+        return () => {
+            window.removeEventListener('resize', handleResize)
+            cancelAnimationFrame(animationFrameId)
+        }
     })
 
-    const sac = {
-        clearCanvas: (ctx) => {
-            ctx.save();
-            ctx.translate(0, 0);
-            ctx.clearRect(0, 0, size, size);
-            ctx.restore();
-            return sac;
-        },
-        drawHand: (ctx, angle, from, to, lineWidth, color) => {
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
-            ctx.beginPath();
-            ctx.rotate(angle);
-            ctx.moveTo(from, 0);
-            ctx.lineTo(to, 0);
-            ctx.lineWidth = lineWidth;
-            ctx.strokeStyle = color;
-            ctx.lineCap = "round";
-            ctx.stroke();
-            ctx.restore();
-            return sac;
-        },
-        fillCircle: (ctx, r, x, y, color, opacity) => {
-            if (dim === 1)
-                return sac;
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
-            if (opacity)
-                ctx.globalAlpha = opacity;
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.restore();
-            return sac;
-        },
-        print: (ctx, text, textSize, color, y) => {
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
-            ctx.font = 'bold ' + Math.floor(textSize) + 'px Arial';
-            ctx.fillStyle = color;
-            ctx.textBaseline = "middle";
-            ctx.textAlign = 'center';
-            ctx.fillText(text, 0, y);
-            ctx.restore();
-            return sac;
-        },
-        printAt(ctx, text, textSize, color, r, angle) {
-            if (dim === 1)
-                return sac;
+    const drawClock = (ctx) => {
+        const canvas = canvasRef.current
+        if (!canvas) return
 
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
-            ctx.textBaseline = "middle";
-            ctx.fillStyle = color;
-            ctx.textAlign = "center";
-            ctx.font = textSize + "px Arial";
-            let ang = angle - Math.PI / 2;
-            ctx.rotate(ang);
-            ctx.translate(0, r);
-            ctx.rotate(-ang);
-            ctx.fillText(text, 0, 0);
-            ctx.restore();
-            return sac;
-        },
-        updateTitle(ctx, title) {
-            document.title = title;
-            return sac;
-        },
-        drawArrow: (ctx, angle, x, width, height, color) => {
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
+        const width = canvas.width
+        const height = canvas.height
 
-            if (dim === 1) {
-                width = width / 2.5;
-                height = height / 2.5;
-                x = x / 1.065;
-            }
+        // Calculate radius based on screen dimensions - use smaller of width/2 or height/2
+        // Center is at middle of screen for full circle
+        const radius = Math.min(width / 2, height / 2) * 0.85
 
-            ctx.rotate(angle);
-            ctx.beginPath();
-            ctx.moveTo(x, -width);
-            ctx.lineTo(x, width);
-            ctx.lineTo(x - height, 0);
-            ctx.fillStyle = (dim === 1 ? silver : color);
-            ctx.fill();
-            ctx.restore();
-            return sac;
-        },
-        drawIndicator: (ctx, r, angle, color) => {
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
-            ctx.rotate(angle);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = black;
-            ctx.lineCap = "round";
-            ctx.beginPath();
-            ctx.arc(r * 1.076, 0, 9, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
+        // Clear canvas
+        ctx.clearRect(0, 0, width, height)
 
-        },
-        markAlarms: (ctx, r) => {
-            alarmSettings.map((a) => {
-                if ((a.frequency === 'E') || (a.frequency === 'W' && isWeekDay))
-                    sac.drawIndicator(ctx, r, a.angle, 'red')
-            });
-            naflAlarmSettings.map((a) => {
-                sac.drawIndicator(ctx, r, a.angle, 'yellowgreen')
-            });
-            return sac;
-        },
-        drawNumbers24: (ctx, r, fontSize, color) => {
-            if (dim === 1)
-                return sac;
+        // Save context for transformations
+        ctx.save()
 
-            let p;
-            for (let n = 0; n < 24; n++) {
-                ctx.save();
-                ctx.translate(size / 2, size / 2);
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = color;
-                ctx.textAlign = "center";
-                ctx.font = 'bold ' + fontSize + "px Arial";
-                let ang = n * Math.PI / 12;
-                ctx.rotate(ang);
-                ctx.translate(0, r); /* move the cursor */
-                ctx.rotate(-ang);
-                if (n === 0)
-                    p = 12 + 'A';
-                else if (n === 12)
-                    p = 12 + 'P';
-                else if (n < 13)
-                    p = n + 'A';
-                else
-                    p = (n - 12) + 'P';
-                ctx.fillText(p, 0, 0);
-                ctx.restore();
-            }
-            for (let m = 0; m < 144; m++) {
-                ctx.save();
-                ctx.translate(size / 2, size / 2);
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = color;
-                ctx.textAlign = "center";
-                let ang = m * Math.PI / 72;
-                ctx.rotate(ang);
-                ctx.translate(0, r * 0.985);
-                if (m % 6 === 0) {
-                    /*
-                    ctx.font = r * 0.051 + "px Arial";
-                    ctx.fillText("|", 0, 0);
-                    */
-                }
-                else {
-                    ctx.font = r * 0.05 + "px Arial";
-                    ctx.fillText(".", 0, 0);
-                }
-                ctx.restore();
-            }
+        // Translate to center of screen
+        const centerX = width / 2
+        const centerY = height / 2
+        ctx.translate(centerX, centerY)
 
-            return sac;
+        // Rotate so that current time is at the top (12 o'clock position)
+        // hourAngle is calculated from 12 o'clock going clockwise for 24 hours
+        const rotationAngle = -hourAngle
+        ctx.rotate(rotationAngle)
 
-        },
-        drawArcs: (ctx, r, arcWidth) => {
+        // Draw full circle background with semi-transparent dark color
+        ctx.beginPath()
+        ctx.arc(0, 0, radius, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(13, 14, 15, 0.7)' // Semi-transparent dark
+        ctx.fill()
 
-            let borderPadding = Math.PI / 450;
-            for (let i = 0; i < arcVakits.length; i++) {
-                ctx.save();
-                ctx.translate(size / 2, size / 2);
-                ctx.beginPath();
+        // Draw prayer time bands in the full circle (24 hours)
+        drawPrayerBands(ctx, radius)
 
-                if (currentArcVakit.index === i) {
-                    ctx.strokeStyle = (dim === 1 ? 'gray' : arcVakits[i].color);
-                    ctx.lineWidth = arcWidth * 0.41;
-                    ctx.globalAlpha = 1;
-                }
-                else {
-                    ctx.strokeStyle = (dim === 1 ? 'gray' : arcVakits[i].color);
-                    ctx.lineWidth = arcWidth * 0.21;
-                    ctx.globalAlpha = 0.67;
-                }
-                ctx.arc(0, 0, r, arcVakits[i].startAngle24(), arcVakits[i].endAngle24() - borderPadding, false);
-                ctx.stroke();
-                ctx.restore();
-            }
-            return sac;
-        },
-        drawCircle: (ctx, r, color, lineWidth, opacity) => {
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
-            if (opacity)
-                ctx.globalAlpha = opacity;
-            ctx.beginPath();
-            ctx.arc(0, 0, r, 0, Math.PI * 2);
-            ctx.strokeStyle = color;
-            ctx.lineWidth = lineWidth;
-            ctx.stroke();
-            ctx.restore();
-            return sac;
-        },
-        arcText: (ctx, mode, text, fontSize, distanceFromCenter, color) => {
+        // Draw time markers (24-hour format)
+        drawTimeMarkers(ctx, radius)
 
-            if (text === '#vakits#') {
-                text = '';
-                for (let v in vakits) {
-                    text += vakits[v].name + ' ' + format12(vakits[v].time);
-                    if (v * 1 !== (vakits.length - 1) * 1)
-                        text += ' · ';
-                }
-            }
+        // Draw current time indicator (at top)
+        drawCurrentTimeIndicator(ctx, radius)
 
-            text = text.replace(/,/g, '')
+        // Restore context
+        ctx.restore()
 
-            let startAngle = 0;
-            ctx.font = 'bold ' + fontSize + 'px Arial';
+        // Draw static UI elements (outside rotation)
+        drawStaticUI(ctx, width, height, radius)
+    }
 
-            ctx.fillStyle = color;
-            if (mode === 'top') {
-                startAngle = -ctx.measureText(text).width / (2 * distanceFromCenter);
-            }
-            else {
-                startAngle = ctx.measureText(text).width / (2 * distanceFromCenter);
-            }
+    const drawPrayerBands = (ctx, radius) => {
+        // Get prayer times from vakits array
+        const fajr = vakits.find(v => v.name === 'Fajr')
+        const dhuhr = vakits.find(v => v.name === 'Dhuhr')
+        const asr = vakits.find(v => v.name === 'Asr')
+        const maghrib = vakits.find(v => v.name === 'Maghrib')
+        const isha = vakits.find(v => v.name === 'Isha')
 
-            let charWidth = {}
-            for (var j = 0; j < text.length; j++) {
-                charWidth[text[j]] = ctx.measureText(text[j]).width;
-            }
+        if (!fajr || !dhuhr || !asr || !maghrib || !isha) return
 
-            var thisSpace = 0;
-            for (var i = 0; i < text.length; i++) {
-                thisSpace += charWidth[text[i]] / distanceFromCenter;
-                ctx.save();
+        const fajrTime = getMinutesFromTime(fajr.time)
+        const dhuhrTime = getMinutesFromTime(dhuhr.time)
+        const asrTime = getMinutesFromTime(asr.time)
+        const maghribTime = getMinutesFromTime(maghrib.time)
+        const ishaTime = getMinutesFromTime(isha.time)
 
-                if (text[i] === '·')
-                    ctx.fillStyle = 'yellow';
-
-                ctx.translate(size / 2, size / 2);
-                ctx.textAlign = "right";
-                if (mode === 'top') {
-                    ctx.rotate(startAngle + thisSpace);
-                    ctx.fillText(text[i], 0, -distanceFromCenter);
-                }
-                else {
-                    ctx.rotate(startAngle - thisSpace);
-                    ctx.fillText(text[i], 0, distanceFromCenter);
-                }
-
-                ctx.restore();
-            }
-            return sac;
+        // Convert to angles for 24-hour full circle (0 to 2π)
+        // 24 hours = 1440 minutes
+        // angle = timeInMinutes * 2π / 1440
+        const toAngle = (minutes) => {
+            return (minutes * 2 * Math.PI / 1440)
         }
+
+        const fajrAngle = toAngle(fajrTime)
+        const dhuhrAngle = toAngle(dhuhrTime)
+        const asrAngle = toAngle(asrTime)
+        const maghribAngle = toAngle(maghribTime)
+        const ishaAngle = toAngle(ishaTime)
+
+        const bandWidth = radius * 0.12
+        const bandRadius = radius * 0.85
+
+        // Draw Isha band (Navy) - from 0 (midnight) to Fajr
+        drawBand(ctx, bandRadius, 0, fajrAngle, prayerColors.isha, bandWidth)
+
+        // Draw Fajr band (Blue)
+        drawBand(ctx, bandRadius, fajrAngle, dhuhrAngle, prayerColors.fajr, bandWidth)
+
+        // Draw Dhuhr band (Amber)
+        drawBand(ctx, bandRadius, dhuhrAngle, asrAngle, prayerColors.dhuhr, bandWidth)
+
+        // Draw Asr band (Green)
+        drawBand(ctx, bandRadius, asrAngle, maghribAngle, prayerColors.asr, bandWidth)
+
+        // Draw Maghrib band (Orange)
+        drawBand(ctx, bandRadius, maghribAngle, ishaAngle, prayerColors.maghrib, bandWidth)
+
+        // Draw Isha band (Navy) - from Isha to midnight (2π)
+        drawBand(ctx, bandRadius, ishaAngle, Math.PI * 2, prayerColors.isha, bandWidth)
+
+        // Draw labels for prayer times with times
+        drawPrayerLabels(ctx, radius, fajrAngle, dhuhrAngle, asrAngle, maghribAngle, ishaAngle)
+    }
+
+    const drawBand = (ctx, radius, startAngle, endAngle, color, width) => {
+        if (startAngle >= endAngle) return
+        
+        ctx.beginPath()
+        ctx.arc(0, 0, radius, startAngle, endAngle)
+        ctx.strokeStyle = color
+        ctx.lineWidth = width
+        ctx.stroke()
+    }
+
+    const drawPrayerLabels = (ctx, radius, fajrAngle, dhuhrAngle, asrAngle, maghribAngle, ishaAngle) => {
+        const fontSize = Math.floor(radius * 0.055)
+        const timefontSize = Math.floor(radius * 0.04)
+        ctx.font = `bold ${fontSize}px Calibri`
+
+        // Get prayer times for display
+        const fajr = vakits.find(v => v.name === 'Fajr')
+        const dhuhr = vakits.find(v => v.name === 'Dhuhr')
+        const asr = vakits.find(v => v.name === 'Asr')
+        const maghrib = vakits.find(v => v.name === 'Maghrib')
+        const isha = vakits.find(v => v.name === 'Isha')
+
+        // Fajr label - in the middle of Fajr band
+        const fajrMidAngle = (fajrAngle + dhuhrAngle) / 2
+        drawLabelWithTime(ctx, arabicPrayerNames.fajr, fajr?.displayTime, radius, fajrMidAngle, fontSize, timefontSize)
+
+        // Dhuhr label - in the middle of Dhuhr band
+        const dhuhrMidAngle = (dhuhrAngle + asrAngle) / 2
+        drawLabelWithTime(ctx, arabicPrayerNames.dhuhr, dhuhr?.displayTime, radius, dhuhrMidAngle, fontSize, timefontSize)
+
+        // Asr label - in the middle of Asr band
+        const asrMidAngle = (asrAngle + maghribAngle) / 2
+        drawLabelWithTime(ctx, arabicPrayerNames.asr, asr?.displayTime, radius, asrMidAngle, fontSize, timefontSize)
+
+        // Maghrib label - in the middle of Maghrib band
+        const maghribMidAngle = (maghribAngle + ishaAngle) / 2
+        drawLabelWithTime(ctx, arabicPrayerNames.maghrib, maghrib?.displayTime, radius, maghribMidAngle, fontSize, timefontSize)
+
+        // Isha label - in the middle of Isha band (between Isha and midnight/Fajr)
+        // Isha band wraps around midnight, so we need to handle it specially
+        const ishaMidAngle = (ishaAngle + (2 * Math.PI + fajrAngle)) / 2
+        drawLabelWithTime(ctx, arabicPrayerNames.isha, isha?.displayTime, radius, ishaMidAngle, fontSize, timefontSize)
+    }
+
+    const drawLabelWithTime = (ctx, text, time, radius, angle, fontSize, timeFont) => {
+        ctx.save()
+        ctx.translate(0, 0)
+        ctx.rotate(angle)
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        
+        // Add text shadow for better visibility
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)'
+        ctx.shadowBlur = 8
+        ctx.shadowOffsetX = 2
+        ctx.shadowOffsetY = 2
+        
+        // Draw prayer name
+        ctx.font = `bold ${fontSize}px Calibri`
+        ctx.fillStyle = white
+        ctx.fillText(text, 0, -radius * 0.85)
+        
+        // Draw prayer time below name
+        if (time) {
+            ctx.font = `bold ${timeFont}px Arial`
+            ctx.fillStyle = white
+            ctx.fillText(time, 0, -radius * 0.78)
+        }
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 0
+        
+        ctx.restore()
+    }
+
+    const drawTimeMarkers = (ctx, radius) => {
+        const markerRadius = radius * 0.95
+        const fontSize = Math.floor(radius * 0.04)
+        ctx.font = `bold ${fontSize}px Arial`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = white
+
+        // Add text shadow for better visibility
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)'
+        ctx.shadowBlur = 6
+        ctx.shadowOffsetX = 1
+        ctx.shadowOffsetY = 1
+
+        // Draw 24-hour markers (0-23)
+        for (let h = 0; h < 24; h++) {
+            const angle = (h * 2 * Math.PI / 24)
+            const x = Math.sin(angle) * markerRadius
+            const y = -Math.cos(angle) * markerRadius
+            
+            // Format hour display
+            let hourText = h.toString().padStart(2, '0')
+            if (h === 0) hourText = '00'
+            
+            ctx.fillText(hourText, x, y)
+        }
+
+        // Draw minute dots
+        ctx.shadowBlur = 3
+        for (let m = 0; m < 144; m++) {
+            ctx.save()
+            ctx.translate(0, 0)
+            ctx.textBaseline = "middle"
+            ctx.fillStyle = white
+            ctx.textAlign = "center"
+            let ang = m * 2 * Math.PI / 144
+            ctx.rotate(ang)
+            ctx.translate(0, markerRadius * 0.985)
+            if (m % 6 === 0) {
+                // Hour marker - skip, we already drew numbers
+            } else {
+                ctx.font = radius * 0.03 + "px Arial"
+                ctx.fillText(".", 0, 0)
+            }
+            ctx.restore()
+        }
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 0
+    }
+
+    const drawCurrentTimeIndicator = (ctx, radius) => {
+        const indicatorRadius = radius * 0.9
+        const indicatorWidth = radius * 0.03
+        const indicatorHeight = radius * 0.15
+
+        ctx.save()
+        ctx.rotate(-hourAngle) // Rotate back to position at top
+
+        // Draw current time indicator at top (12 o'clock position)
+        ctx.fillStyle = white
+        ctx.beginPath()
+        ctx.moveTo(-indicatorWidth, -indicatorRadius)
+        ctx.lineTo(indicatorWidth, -indicatorRadius)
+        ctx.lineTo(0, -indicatorRadius - indicatorHeight)
+        ctx.closePath()
+        ctx.fill()
+
+        ctx.restore()
+    }
+
+    const drawStaticUI = (ctx, width, height, radius) => {
+        const centerX = width / 2
+        const centerY = height / 2
+
+        // Font sizes - make dates larger and more visible
+        const remainingFontSize = Math.floor(radius * 0.06)
+        const prayerFontSize = Math.floor(radius * 0.15)
+        const timeFontSize = Math.floor(radius * 0.25)
+        const dateFontSize = Math.floor(radius * 0.055)
+
+        // Add text shadow for better visibility
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
+        ctx.shadowBlur = 10
+        ctx.shadowOffsetX = 2
+        ctx.shadowOffsetY = 2
+
+        // Current time at center
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.font = `bold ${timeFontSize}px Arial`
+        ctx.fillStyle = white
+        ctx.fillText(displayTime, centerX, centerY + radius * 0.05)
+
+        // Current prayer name in Arabic (above time)
+        ctx.font = `bold ${prayerFontSize}px Calibri`
+        ctx.fillStyle = white
+        const currentPrayerName = arabicPrayerNames[currentVakit.name.toLowerCase()] || currentVakit.name
+        ctx.fillText(currentPrayerName, centerX, centerY - radius * 0.15)
+
+        // Remaining time (above prayer name)
+        ctx.font = `bold ${remainingFontSize}px Arial`
+        ctx.fillStyle = white
+        const remainingText = `${nextText} remaining`
+        ctx.fillText(remainingText, centerX, centerY - radius * 0.3)
+
+        // English date in top left corner - larger and more visible
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'top'
+        ctx.font = `bold ${dateFontSize}px Arial`
+        ctx.fillStyle = white
+        
+        // Parse and format English date nicely
+        const englishDateParts = todaysDate.split(' ')
+        const dayOfWeek = englishDateParts[0] || ''
+        const dayNum = englishDateParts[1] || ''
+        const month = englishDateParts[2] || ''
+        const year = englishDateParts[3] || ''
+        
+        const leftMargin = 20
+        const topMargin = 20
+        
+        ctx.fillText(dayOfWeek, leftMargin, topMargin)
+        ctx.fillText(`${dayNum} ${month} ${year}`, leftMargin, topMargin + dateFontSize * 1.3)
+
+        // Hijri date in top right corner - larger and in Arabic
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'top'
+        ctx.font = `bold ${dateFontSize}px Calibri`
+        ctx.fillStyle = white
+        
+        const rightMargin = width - 20
+        
+        // Parse hijri date
+        const hijriParts = hijriDate.split(' ')
+        const hijriDay = hijriParts[0] || ''
+        const hijriMonth = hijriParts[1] || ''
+        const hijriYear = hijriParts[2] || ''
+        
+        // Display hijri date in Arabic format
+        ctx.fillText(hijriDate, rightMargin, topMargin)
+        
+        // Add day of week in Arabic if available
+        const arabicDays = {
+            'Sunday': 'الأحد',
+            'Monday': 'الإثنين',
+            'Tuesday': 'الثلاثاء',
+            'Wednesday': 'الأربعاء',
+            'Thursday': 'الخميس',
+            'Friday': 'الجمعة',
+            'Saturday': 'السبت'
+        }
+        const arabicDayOfWeek = arabicDays[dayOfWeek] || ''
+        if (arabicDayOfWeek) {
+            ctx.fillText(arabicDayOfWeek, rightMargin, topMargin + dateFontSize * 1.3)
+        }
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent'
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 0
+    }
+
+    const getMinutesFromTime = (timeStr) => {
+        if (!timeStr) return 0
+        const parts = timeStr.split(':')
+        return parseInt(parts[0]) * 60 + parseInt(parts[1])
     }
 
     const updateBackground = (bg) => {
         if (bg.length > 0) {
-            document.body.style.backgroundImage = 'url(' + bg + ')';
-            document.body.style.backgroundSize = '110% 110%';
-            document.body.style.backgroundRepeat = 'no-repeat';
-        }
-        else {
-            document.body.style.backgroundImage = null;
-            document.body.style.backgroundSize = null;
-            document.body.style.backgroundRepeat = null;
-            document.body.style.backgroundPosition = null;
+            document.body.style.backgroundImage = 'url(' + bg + ')'
+            document.body.style.backgroundSize = '110% 110%'
+            document.body.style.backgroundRepeat = 'no-repeat'
+        } else {
+            document.body.style.backgroundImage = null
+            document.body.style.backgroundSize = null
+            document.body.style.backgroundRepeat = null
+            document.body.style.backgroundPosition = null
         }
     }
 
@@ -403,9 +520,9 @@ export default function Clock() {
                     style={{ touchAction: 'none', cursor: 'grab' }}>
                     <canvas id="clockCanvas" className="img-fluid"
                         style={{ opacity: clockOpacity, transform: deviceSettings.zoomedIn === 'Y' ? 'scale(2.2) translateY(-3%)' : 'none' }}
-                        width={size} height={size} ref={canvasRef} ></canvas>
+                        width={window.innerWidth} height={window.innerHeight} ref={canvasRef}></canvas>
                 </div>
             </div>
-        </div >
-    );
+        </div>
+    )
 }

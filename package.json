@@ -25,7 +25,8 @@
     "cross-env": "^7.0.3"
   },
   "scripts": {
-    "start": "cross-env HTTPS=true SSL_CRT_FILE=cert.crt SSL_KEY_FILE=cert.key react-scripts start",
+    "startSSL": "cross-env HTTPS=true SSL_CRT_FILE=cert.crt SSL_KEY_FILE=cert.key react-scripts start",
+    "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
