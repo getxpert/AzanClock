@@ -849,29 +849,23 @@ export default function Clock() {
 
     return (
         <>
-            {/* Top-left corner: AzanClock two lines */}
+            {/* Top-left corner: app icon */}
             <div style={{
                 position: 'fixed', top: 0, left: 0,
                 width: SIDE_TOTAL_L, height: TOP_BAR,
-                background: 'black', color: 'white',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                background: 'black',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 zIndex: 101, overflow: 'hidden',
-                lineHeight: 1.1,
             }}>
-                <span style={{
-                    fontFamily: calibri,
-                    fontSize: `clamp(10px, ${TOP_BAR * 0.38}px, 1.8vw)`,
-                    fontWeight: 'bold',
-                    letterSpacing: 2,
-                    whiteSpace: 'nowrap',
-                }}>SALAH</span>
-                <span style={{
-                    fontFamily: calibri,
-                    fontSize: `clamp(10px, ${TOP_BAR * 0.38}px, 1.8vw)`,
-                    fontWeight: 'bold',
-                    letterSpacing: 2,
-                    whiteSpace: 'nowrap',
-                }}>TIMES</span>
+                <img
+                    src="/icon4.png"
+                    alt="AzanClock"
+                    style={{
+                        maxWidth: '90%',
+                        maxHeight: '90%',
+                        objectFit: 'contain',
+                    }}
+                />
             </div>
 
             {/* Top-right corner: نور الصلاة */}
@@ -997,6 +991,70 @@ export default function Clock() {
             <BottomPanel />
             <LeftPanel />
             <RightPanel />
+
+            {/* ── Islamic date overlay — top-right, between side bars and clock circle ── */}
+            {(() => {
+                const arabicHijriMonths = [
+                    'مُحَرَّم','صَفَر','رَبيع الأوَّل','رَبيع الثاني',
+                    'جُمادى الأولى','جُمادى الآخِرة','رَجَب','شَعبان',
+                    'رَمَضان','شَوَّال','ذو القَعدة','ذو الحِجَّة'
+                ]
+                const arabicDayName = arDays.find(d => d.jsDay === currentDayOfWeek)?.label ?? ''
+                const arabicMonthName = arabicHijriMonths[(currentHijriMonth - 1)] ?? ''
+                // Convert digits to Eastern Arabic numerals
+                const toArabicNumerals = (n) =>
+                    String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d])
+                const arabicDay  = toArabicNumerals(currentHijriDay)
+                const arabicYear = toArabicNumerals(currentHijriYear)
+                const isFriday   = currentDayOfWeek === 5
+                const isRamadan  = currentHijriMonth === 9
+                return (
+                    <div style={{
+                        position: 'fixed',
+                        bottom: BOTTOM_BAR + 12,
+                        right: SIDE_TOTAL_R + 16,
+                        zIndex: 98,
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'baseline',
+                        gap: 12,
+                        direction: 'rtl',
+                        pointerEvents: 'none',
+                        fontFamily: calibri,
+                        textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
+                        whiteSpace: 'nowrap',
+                    }}>
+                        {/* Day name — green on Friday, amber otherwise */}
+                        <span style={{
+                            fontSize: 'clamp(28px, 4.2vw, 68px)',
+                            fontWeight: 'bold',
+                            lineHeight: 1.15,
+                            color: isFriday ? '#4ade80' : '#fbbf24',
+                        }}>{arabicDayName}</span>
+                        {/* Day number — always white */}
+                        <span style={{
+                            fontSize: 'clamp(28px, 4.2vw, 68px)',
+                            fontWeight: 'bold',
+                            lineHeight: 1.15,
+                            color: 'rgba(255,255,255,0.92)',
+                        }}>{arabicDay}</span>
+                        {/* Month name — green in Ramadan, amber otherwise */}
+                        <span style={{
+                            fontSize: 'clamp(28px, 4.2vw, 68px)',
+                            fontWeight: 'bold',
+                            lineHeight: 1.15,
+                            color: isRamadan ? '#4ade80' : '#fbbf24',
+                        }}>{arabicMonthName}</span>
+                        {/* Hijri year */}
+                        <span style={{
+                            fontSize: 'clamp(22px, 3.4vw, 56px)',
+                            fontWeight: 'normal',
+                            lineHeight: 1.15,
+                            color: 'rgba(255,255,255,0.85)',
+                        }}>{arabicYear} هـ</span>
+                    </div>
+                )
+            })()}
 
             {/* Weather overlay — top-left corner of the clock viewport area */}
             {weatherData && weatherIcon && (() => {
