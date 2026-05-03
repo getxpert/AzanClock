@@ -117,7 +117,16 @@ export default function Settings() {
                     values={[
                         { id: 'A', name: '🕐 Analogue' },
                         { id: 'D', name: '🔢 Digital'  },
-                        { id: 'B', name: '⊕ Both'     },
+                        { id: 'B', name: '⊕ Both'      },
+                    ]} />
+            </div>
+
+            <div className="mt-2">
+                <span className='badge mb-1 p-0'>Time Format</span>
+                <Options name="deviceSettings.timeFormat" selectedValue={deviceSettings.timeFormat || '12'}
+                    values={[
+                        { id: '12', name: '🕛 12-hour' },
+                        { id: '24', name: '🕐 24-hour' },
                     ]} />
             </div>
 

@@ -164,15 +164,23 @@ export default function Clock() {
 
         updateBackground(background);
 
-        const clockStyle = deviceSettings.clockStyle || 'A'
+        const clockStyle   = deviceSettings.clockStyle  || 'A'
+        const timeFormat   = deviceSettings.timeFormat   || '12'
         const showDigital  = clockStyle === 'D' || clockStyle === 'B'
+        const show24h      = timeFormat === '24'
         const showAnalogue = clockStyle === 'A' || clockStyle === 'B'
+
+        // 24h zero-padded time: "09:05", "13:47" etc.
+        const now24        = new Date()
+        const hh           = String(now24.getHours()).padStart(2, '0')
+        const mm           = String(now24.getMinutes()).padStart(2, '0')
+        const bigTime      = show24h ? `${hh}:${mm}` : displayTime
 
         sac.clearCanvas(ctx)
             .fillCircle(ctx, 490, 0, 0, white, 0.33)
             .fillCircle(ctx, 488, 0, 0, black)
+            .drawArcs(ctx, 458, 41)
             .drawNumbers24(ctx, 455, 13, white)
-            .drawArcs(ctx, 421, 41)
             .drawHand(ctx, midnightAngle, 413, 443, 3.5, black)
             .printAt(ctx, '1/2', 14, white, 403, midnightAngle)
             .drawHand(ctx, oneThirdAngle, 413, 443, 3.5, black)
@@ -180,20 +188,37 @@ export default function Clock() {
             .drawHand(ctx, twoThirdAngle, 413, 443, 3.5, black)
             .printAt(ctx, '2/3', 14, white, 403, twoThirdAngle)
             .markAlarms(ctx, 391)
-            .drawArrow(ctx, hourAngle, 479, 41, 59, black)
-            .drawArrow(ctx, hourAngle, 479, 41, 56, white)
+            .drawArrow(ctx, hourAngle, 479, 20, 29, black)
+            .drawArrow(ctx, hourAngle, 479, 20, 27, white)
             .drawCircle(ctx, 482, black, 9)
 
         if (showDigital) {
-            sac.print(ctx, displayTime, 250, white, -27)
+            // Large time fills the inner dial — font sized to span ~faceR diameter
+            sac.print(ctx, bigTime, 220, white, 0)
         }
 
-        sac.print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
-            .print(ctx, nextText, 156, white, 223)
-            .updateTitle(ctx, 'AzanClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)
+        if (showAnalogue) {
+            // ── Analogue-only text layout ─────────────────────────────────────
+            // Arabic salah name — top of dial, big, amber
+            if (currentArcVakit.name !== 'Duhaend')
+                sac.printXY(ctx, arabicPrayerNames[currentArcVakit.name] || currentArcVakit.name, 80, '#FFC800', 0, -380)
 
-        if (currentArcVakit.name != 'Duhaend')
-            sac.print(ctx, arabicPrayerNames[currentArcVakit.name] || currentArcVakit.name, 56, white, -191);
+            // Current time — far right near edge, clear of hands, large
+            sac.printXY(ctx, bigTime, 104, white, 320, 0)
+
+            // Remaining time — near 6 o'clock, Arabic prayer name + larger countdown
+            sac.printXY(ctx, arabicPrayerNames[nextVakit.name] || nextVakit.name, 56, white, 0, 265)
+            sac.printXY(ctx, nextText, 104, white, 0, 355)
+        } else {
+            // ── Digital / Both — original layout ─────────────────────────────
+            sac.print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
+                .print(ctx, nextText, 156, white, 223)
+
+            if (currentArcVakit.name !== 'Duhaend')
+                sac.print(ctx, arabicPrayerNames[currentArcVakit.name] || currentArcVakit.name, 56, white, -191)
+        }
+
+        sac.updateTitle(ctx, 'AzanClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)
 
         if (showAnalogue)
             sac.drawAnalogueClock(ctx);
@@ -249,6 +274,17 @@ export default function Clock() {
             ctx.restore();
             return sac;
         },
+        printXY: (ctx, text, textSize, color, x, y) => {
+            ctx.save();
+            ctx.translate(size / 2, size / 2);
+            ctx.font = 'bold ' + Math.floor(textSize) + 'px Arial';
+            ctx.fillStyle = color;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, x, y);
+            ctx.restore();
+            return sac;
+        },
         printAt(ctx, text, textSize, color, r, angle) {
             if (dim === 1)
                 return sac;
@@ -283,9 +319,16 @@ export default function Clock() {
 
             ctx.rotate(angle);
             ctx.beginPath();
-            ctx.moveTo(x, -width);
-            ctx.lineTo(x, width);
-            ctx.lineTo(x - height, 0);
+            // Rounded triangle: tip at (x - height, 0), base corners at (x, ±width)
+            const r = Math.min(width, height) * 0.45;
+            const tip   = [x - height, 0];
+            const baseT = [x, -width];
+            const baseB = [x,  width];
+            ctx.moveTo((tip[0] + baseT[0]) / 2, (tip[1] + baseT[1]) / 2);
+            ctx.arcTo(tip[0],   tip[1],   (tip[0] + baseB[0]) / 2, (tip[1] + baseB[1]) / 2, r);
+            ctx.arcTo(baseB[0], baseB[1], (baseB[0] + baseT[0]) / 2, (baseB[1] + baseT[1]) / 2, r);
+            ctx.arcTo(baseT[0], baseT[1], (tip[0] + baseT[0]) / 2, (tip[1] + baseT[1]) / 2, r);
+            ctx.closePath();
             ctx.fillStyle = (dim === 1 ? silver : color);
             ctx.fill();
             ctx.restore();
@@ -320,55 +363,41 @@ export default function Clock() {
             if (dim === 1)
                 return sac;
 
-            let p;
-            for (let n = 0; n < 24; n++) {
-                ctx.save();
-                ctx.translate(size / 2, size / 2);
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = color;
-                ctx.textAlign = "center";
-                ctx.font = 'bold ' + fontSize + "px Arial";
-                let ang = n * Math.PI / 12;
-                ctx.rotate(ang);
-                ctx.translate(0, r); /* move the cursor */
-                ctx.rotate(-ang);
-                if (n === 0)
-                    p = 12 + 'A';
-                else if (n === 12)
-                    p = 12 + 'P';
-                else if (n < 13)
-                    p = n + 'A';
-                else
-                    p = (n - 12) + 'P';
-                ctx.fillText(p, 0, 0);
-                ctx.restore();
-            }
-            for (let m = 0; m < 144; m++) {
-                ctx.save();
-                ctx.translate(size / 2, size / 2);
-                ctx.textBaseline = "middle";
-                ctx.fillStyle = color;
-                ctx.textAlign = "center";
-                let ang = m * Math.PI / 72;
-                ctx.rotate(ang);
-                ctx.translate(0, r * 0.985);
-                if (m % 6 === 0) {
-                    /*
-                    ctx.font = r * 0.051 + "px Arial";
-                    ctx.fillText("|", 0, 0);
-                    */
-                }
-                else {
-                    ctx.font = r * 0.05 + "px Arial";
-                    ctx.fillText(".", 0, 0);
-                }
-                ctx.restore();
+            // ── Minute ring: ticks + labels at 5-min intervals ────────────────
+            // r is the radius passed in (455); place ticks just inside that edge
+            const tickOuter = r          // outer edge of tick
+            const tickInner = r - 18     // long tick (every 5 min)
+            const tickInnerSm = r - 10   // short tick (every 1 min)
+
+            for (let m = 0; m < 60; m++) {
+                const ang = (m / 60) * Math.PI * 2 - Math.PI / 2
+                const isFive = m % 5 === 0
+                const inner = isFive ? tickInner : tickInnerSm
+
+                ctx.save()
+                ctx.translate(size / 2, size / 2)
+                ctx.beginPath()
+                ctx.moveTo(Math.cos(ang) * inner, Math.sin(ang) * inner)
+                ctx.lineTo(Math.cos(ang) * tickOuter, Math.sin(ang) * tickOuter)
+                ctx.strokeStyle = isFive ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.3)'
+                ctx.lineWidth = isFive ? 2.5 : 1.2
+                ctx.lineCap = 'round'
+                ctx.stroke()
+                ctx.restore()
+
+
             }
 
             return sac;
 
         },
         drawArcs: (ctx, r, arcWidth) => {
+
+            // ── Prayer arcs: half-width band, centred so it touches both edges ──
+            const outerR = 488
+            const bandW  = outerR - r          // full available band (67px)
+            const arcW   = bandW / 2            // half thickness
+            const midR   = r + bandW / 2        // centre of the band
 
             let borderPadding = Math.PI / 450;
             for (let i = 0; i < arcVakits.length; i++) {
@@ -378,15 +407,15 @@ export default function Clock() {
 
                 if (currentArcVakit.index === i) {
                     ctx.strokeStyle = (dim === 1 ? 'gray' : arcVakits[i].color);
-                    ctx.lineWidth = arcWidth * 0.41;
-                    ctx.globalAlpha = 1;
+                    ctx.lineWidth = arcW;
+                    ctx.globalAlpha = 0.95;
                 }
                 else {
                     ctx.strokeStyle = (dim === 1 ? 'gray' : arcVakits[i].color);
-                    ctx.lineWidth = arcWidth * 0.21;
-                    ctx.globalAlpha = 0.67;
+                    ctx.lineWidth = arcW;
+                    ctx.globalAlpha = 0.45;
                 }
-                ctx.arc(0, 0, r, arcVakits[i].startAngle24(), arcVakits[i].endAngle24() - borderPadding, false);
+                ctx.arc(0, 0, midR, arcVakits[i].startAngle24(), arcVakits[i].endAngle24() - borderPadding, false);
                 ctx.stroke();
                 ctx.restore();
             }
@@ -419,7 +448,7 @@ export default function Clock() {
             text = text.replace(/,/g, '')
 
             let startAngle = 0;
-            ctx.font = 'bold ' + fontSize + 'px Arial';
+            ctx.font = 'bold ' + fontSize + 'px Calibiri';
 
             ctx.fillStyle = color;
             if (mode === 'top') {
@@ -468,24 +497,6 @@ export default function Clock() {
             const cy    = size / 2;
             const faceR = 370;
 
-            // ── Tick marks ────────────────────────────────────────────────────
-            ctx.save();
-            ctx.translate(cx, cy);
-            for (let t = 0; t < 60; t++) {
-                const ang    = (t / 60) * Math.PI * 2 - Math.PI / 2;
-                const isHour = t % 5 === 0;
-                const inner  = faceR * (isHour ? 0.88 : 0.93);
-                const outer  = faceR * 0.98;
-                ctx.beginPath();
-                ctx.moveTo(Math.cos(ang) * inner, Math.sin(ang) * inner);
-                ctx.lineTo(Math.cos(ang) * outer, Math.sin(ang) * outer);
-                ctx.strokeStyle = isHour ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)';
-                ctx.lineWidth   = isHour ? 3 : 1.5;
-                ctx.lineCap     = 'round';
-                ctx.stroke();
-            }
-            ctx.restore();
-
             // ── PNG hand helper ───────────────────────────────────────────────
             // img        — HTMLImageElement
             // angle      — rotation in radians (0 = 12 o'clock)
@@ -511,11 +522,11 @@ export default function Clock() {
 
             // ── Hour hand ─────────────────────────────────────────────────────
             const hourAng = ((hrs + mins / 60) / 12) * Math.PI * 2;
-            drawPngHand(hourImgRef.current, hourAng, 857, 168, 165, 85, faceR * 0.56);
+            drawPngHand(hourImgRef.current, hourAng, 857, 168, 165, 85, faceR * 1.16);
 
             // ── Minute hand ───────────────────────────────────────────────────
             const minAng = ((mins + secs / 60) / 60) * Math.PI * 2;
-            drawPngHand(minuteImgRef.current, minAng, 857, 168, 165, 85, faceR * 0.80);
+            drawPngHand(minuteImgRef.current, minAng, 857, 168, 165, 85, faceR * 1.16);
 
             // ── Second hand (red line) ────────────────────────────────────────
             const secAng = (secs / 60) * Math.PI * 2 - Math.PI / 2;
@@ -524,7 +535,7 @@ export default function Clock() {
             ctx.rotate(secAng);
             ctx.beginPath();
             ctx.moveTo(-faceR * 0.18, 0);
-            ctx.lineTo(faceR * 0.95, 0);
+            ctx.lineTo(faceR * 1.1, 0);
             ctx.strokeStyle = '#ef4444';
             ctx.lineWidth   = 3;
             ctx.lineCap     = 'round';
@@ -726,7 +737,7 @@ export default function Clock() {
                             }}>
                                 <span style={{
                                     fontSize: prayerFont,
-                                    fontFamily: timeFont,
+                                    fontFamily: calibri, //timeFont
                                     letterSpacing: '0.04em',
                                 }}>
                                     {v.displayTime}
