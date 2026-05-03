@@ -8,6 +8,7 @@ import Loading from './components/Loading';
 import Clock from './components/Clock';
 import AudioPlayer from './components/AudioPlayer';
 import SilkSilentAudio from './components/SilkSilentAudio'
+import { weatherService } from './services/WeatherService';
 
 export const AppContext = React.createContext();
 
@@ -17,6 +18,7 @@ export default function AppContextProvider() {
     const [showLoading, setShowLoading] = useState(false);
     const [isAudioPlaying, setIsAudioPlaying] = useState(false);
     const [isSilkBrowser, setIsSilkBrowser] = useState(false);
+    const [weatherData, setWeatherData] = useState(null);
 
     const [output, setOutput] = useState(() => {
 
@@ -63,6 +65,19 @@ export default function AppContextProvider() {
                 setOutput(SmartAzanClock.run('on-visible-again'));
             }
         });
+        
+        // Initialize weather service with location coordinates
+        const settings = JSON.parse(localStorage.getItem('settings'));
+        if (settings && settings.locationSettings) {
+            const { lat, lng } = settings.locationSettings;
+            if (lat && lng) {
+                // Initialize weather service with callback to update state
+                weatherService.initialize(lat, lng, (data) => {
+                    setWeatherData(data);
+                });
+            }
+        }
+        
         // If not running under azanclock.com, show a persistent toast advising re-install
         try {
             const hostname = (window.location.hostname || '').toLowerCase();
@@ -82,6 +97,11 @@ export default function AppContextProvider() {
         } catch (e) {
             // ignore errors (e.g., window not available)
         }
+        
+        // Cleanup: stop weather service when component unmounts
+        return () => {
+            weatherService.stop();
+        };
     }, [])
 
     const showMsg = (msg, type) => {
@@ -107,6 +127,15 @@ export default function AppContextProvider() {
         let newSettings = { ...currentSettings, ...kv }
         localStorage.setItem('settings', JSON.stringify({ ...newSettings }));
         setOutput(SmartAzanClock.run("set" + JSON.stringify(kv)));
+        
+        // If location settings changed, update weather service
+        if (kv.locationSettings) {
+            const { lat, lng } = { ...currentSettings.locationSettings, ...kv.locationSettings };
+            if (lat && lng) {
+                weatherService.updateLocation(lat, lng);
+            }
+        }
+        
         if (msg)
             showMsg(msg);
     }
@@ -157,7 +186,7 @@ export default function AppContextProvider() {
     }
 
     return (
-        <AppContext.Provider value={{ showMenu, setShowMenu, showMsg, showPersistentToast, isAudioPlaying, setIsAudioPlaying, ...output, updateSettings, updateOffset, previewAudio, reciteQuranAudio, dol }}>
+        <AppContext.Provider value={{ showMenu, setShowMenu, showMsg, showPersistentToast, isAudioPlaying, setIsAudioPlaying, weatherData, ...output, updateSettings, updateOffset, previewAudio, reciteQuranAudio, dol }}>
             {output ? <Clock /> : null}
             {showLoading ? <Loading /> : null}
             {output ? <Menu /> : null}

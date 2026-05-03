@@ -5,6 +5,7 @@ import { Backgrounds } from '../data/Backgrounds';
 import { DefaultSettings } from '../data/DefaultSettings';
 import { CalculationMethods } from '../data/CalculationMethods';
 import { TimeToRadians } from './Common';
+import { getDimmingConfig } from '../services/DimmingController';
 
 const prayTimes = new PrayTimes();
 
@@ -115,6 +116,15 @@ export const SmartAzanClock = {
         this.output.twoThirdTime = addMinutesToTime(this.getPrayerTime('maghrib'), twoThird);
         this.output.oneThirdAngle = (TimeToRadians(this.getPrayerTime('maghrib'), 24) + oneThird * Math.PI / 720) % (2 * Math.PI);
         this.output.twoThirdAngle = (TimeToRadians(this.getPrayerTime('maghrib'), 24) + twoThird * Math.PI / 720) % (2 * Math.PI);
+
+        // Calculate intelligent dimming based on sunrise/sunset times
+        const sunriseTime = this.getPrayerTime('sunrise');
+        const sunsetTime = this.getPrayerTime('sunset');
+        const dimmingConfig = getDimmingConfig(this.currentTimeString, sunriseTime, sunsetTime);
+        
+        // Store dimming information for use by Clock component
+        this.output.dimmingConfig = dimmingConfig;
+        this.output.backgroundOpacity = dimmingConfig.opacity;
 
         if (
             this.settings.deviceSettings.mode === 'D'

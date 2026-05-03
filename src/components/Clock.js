@@ -1,12 +1,13 @@
 import React, { useContext, useEffect, useRef } from 'react'
 import { AppContext } from '../AppContext';
 import { format12 } from '../scripts/SmartAzanClock'
+import { HijriMonths } from '../data/Common'
 
 export default function Clock() {
 
     const { showMenu, setShowMenu, nextText, todaysDate, hijriDate, locationSettings,
         calculationSettings, deviceSettings, hourAngle, vakits, arcVakits, displayTime, currentVakit, nextVakit, currentArcVakit,
-        elapsed, background, dim, clockOpacity, midnightAngle, oneThirdAngle, twoThirdAngle, alarmSettings, naflAlarmSettings, isWeekDay } = useContext(AppContext)
+        elapsed, background, dim, clockOpacity, midnightAngle, oneThirdAngle, twoThirdAngle, alarmSettings, naflAlarmSettings, isWeekDay, weatherData, time } = useContext(AppContext)
     const canvasRef = useRef(null)
     const driftRef = useRef(null)
     const dragWrapperRef = useRef(null)
@@ -111,12 +112,37 @@ export default function Clock() {
             .print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
             .print(ctx, nextText, 156, white, 223)
             .updateTitle(ctx, 'AzanClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)
-            .arcText(ctx, 'top', todaysDate, 45, 337, white)
-            .arcText(ctx, 'top', hijriDate, 39, 265, white)
-            .arcText(ctx, 'bottom', '#vakits#', 31, 377, white)
+
 
         if (currentArcVakit.name != 'Duhaend')
             sac.print(ctx, currentArcVakit.name, 37, white, -191);
+
+        // Weather — temperature + icon at the top of the dial, moon phase + location below centre
+        if (weatherData) {
+            const weatherIcon = (() => {
+                const code = weatherData.weatherCode;
+                if (code === 0)                          return '☀️';   // Clear
+                if (code === 1)                          return '🌤️';  // Mainly Clear
+                if (code === 2)                          return '⛅';   // Partly Cloudy
+                if (code === 3)                          return '☁️';   // Overcast
+                if (code === 45 || code === 48)          return '🌫️';  // Fog
+                if (code >= 51 && code <= 57)            return '🌦️';  // Drizzle
+                if (code >= 61 && code <= 67)            return '🌧️';  // Rain
+                if (code >= 71 && code <= 77)            return '❄️';   // Snow
+                if (code >= 80 && code <= 82)            return '🌧️';  // Showers
+                if (code >= 85 && code <= 86)            return '🌨️';  // Snow Showers
+                if (code >= 95 && code <= 99)            return '⛈️';  // Thunderstorm
+                return '🌡️';
+            })();
+            // Large temperature + icon at the top of the dial (~y = -310)
+            sac.print(ctx, `${weatherIcon} ${weatherData.temperature}°C`, 72, white, -310);
+            if (locationSettings && locationSettings.address) {
+                sac.print(ctx, locationSettings.address, 24, white, -230);
+            }
+            if (weatherData.moonPhase) {
+                sac.drawMoon(ctx, weatherData.moonPhase.cyclePosition, weatherData.moonPhase.name, 345);
+            }
+        }
 
     })
 
@@ -374,6 +400,92 @@ export default function Clock() {
                 ctx.restore();
             }
             return sac;
+        },
+        // Draw a greyscale moon using canvas geometry.
+        // cyclePosition: 0–1 (0 = new moon, 0.5 = full moon)
+        // phaseName: label shown below the moon
+        // cy: vertical centre offset from canvas centre (positive = down)
+        drawMoon: (ctx, cyclePosition, phaseName, cy) => {
+            const r = 36;           // moon radius — matches weather icon visual size
+            const cx = 0;           // horizontally centred
+            const centerY = size / 2 + cy;
+            const centerX = size / 2 + cx;
+
+            ctx.save();
+
+            // Dark disc (unlit face)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+            ctx.fillStyle = '#222';
+            ctx.fill();
+
+            // Lit portion — greyscale crescent / gibbous overlay
+            // cyclePosition 0→0.5 = waxing (right side lit), 0.5→1 = waning (left side lit)
+            const waxing = cyclePosition <= 0.5;
+            // Map 0–0.5 → 0–1 (waxing) and 0.5–1 → 1–0 (waning)
+            const phase = waxing ? cyclePosition * 2 : (1 - cyclePosition) * 2;
+
+            // The lit ellipse x-radius: 0 = new (line), 1 = full (circle)
+            // For crescent: inner ellipse is dark, outer is lit
+            // For gibbous:  inner ellipse is lit, outer is lit
+            const isGibbous = phase > 0.5;
+            const ellipseRx = isGibbous
+                ? r * (2 * phase - 1)   // 0→r as phase goes 0.5→1
+                : r * (1 - 2 * phase);  // r→0 as phase goes 0→0.5
+
+            // Clip to the moon disc
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+            ctx.clip();
+
+            if (isGibbous) {
+                // Paint the whole visible half lit, then mask out the dark ellipse
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, r, -Math.PI / 2, Math.PI / 2, waxing ? false : true);
+                ctx.closePath();
+                ctx.fillStyle = '#ddd';
+                ctx.fill();
+
+                // Dark inner ellipse (shadow side)
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY, ellipseRx, r, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#222';
+                ctx.fill();
+            } else {
+                // Crescent: lit half-disc minus dark inner ellipse
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, r, -Math.PI / 2, Math.PI / 2, waxing ? false : true);
+                ctx.closePath();
+                ctx.fillStyle = '#ddd';
+                ctx.fill();
+
+                // Dark inner ellipse covers most of the lit half → thin crescent remains
+                ctx.beginPath();
+                ctx.ellipse(centerX, centerY, ellipseRx, r, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#222';
+                ctx.fill();
+            }
+
+            // Subtle rim highlight
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.restore();
+
+            // Phase name label below the moon
+            ctx.save();
+            ctx.translate(size / 2, size / 2);
+            ctx.font = '18px Arial';
+            ctx.fillStyle = 'rgba(200,200,200,0.9)';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            ctx.fillText(phaseName, 0, cy + r + 16);
+            ctx.restore();
+
+            return sac;
         }
     }
 
@@ -391,21 +503,499 @@ export default function Clock() {
         }
     }
 
+    // ── Border panel helpers ──────────────────────────────────────────────────
+
+    // Derive current Gregorian day/month/year from todaysDate context value
+    const now = new Date()
+    const tzID = locationSettings?.timeZoneID || 'UTC'
+    const localNow = new Date(now.toLocaleString('en-US', { timeZone: tzID }))
+    const currentGregorianDay   = localNow.getDate()
+    const currentGregorianMonth = localNow.getMonth()       // 0-based
+    const currentGregorianYear  = localNow.getFullYear()
+    const daysInMonth = new Date(currentGregorianYear, currentGregorianMonth + 1, 0).getDate()
+
+    // Derive current Hijri day/month from hijriDate string e.g. "3 Rajab 1446"
+    // Month name may contain spaces (e.g. "Rabi Al-Awwal"), so take everything
+    // between the first token (day) and the last token (year) as the month name.
+    let currentHijriDay = 1, currentHijriMonth = 1, currentHijriYear = 1446
+    try {
+        const hParts = hijriDate ? hijriDate.split(' ') : []
+        if (hParts.length >= 3) {
+            currentHijriDay   = parseInt(hParts[0], 10)
+            currentHijriYear  = parseInt(hParts[hParts.length - 1], 10)
+            const monthName   = hParts.slice(1, hParts.length - 1).join(' ')
+            currentHijriMonth = HijriMonths.indexOf(monthName) + 1   // 1-based; 0 if not found → stays 1
+        }
+    } catch (e) { /* ignore */ }
+
+    // Days in current Hijri month — approximate using JS Islamic calendar
+    let daysInHijriMonth = 30
+    try {
+        const hijriMonthStart = new Date(now.toLocaleString('en-US', { timeZone: tzID }))
+        hijriMonthStart.setDate(hijriMonthStart.getDate() - currentHijriDay + 1)
+        // Count forward until the Hijri month changes
+        let count = 0
+        for (let d = 1; d <= 30; d++) {
+            const probe = new Date(hijriMonthStart)
+            probe.setDate(hijriMonthStart.getDate() + d - 1)
+            const hm = parseInt(probe.toLocaleDateString('en-SA-u-ca-islamic-umalqura', { timeZone: tzID, month: 'numeric' }), 10)
+            if (hm === currentHijriMonth) count = d
+            else if (count > 0) break
+        }
+        if (count > 0) daysInHijriMonth = count
+    } catch (e) { /* ignore */ }
+
+    // Current hour (0-23)
+    const currentHour = localNow.getHours()
+
+    // Shared panel style constants
+    const TOP_BAR       = 56                        // prayer bar — taller, at the top
+    const BOTTOM_BAR    = 32                        // 24-hour bar — at the bottom
+    const SIDE_INNER    = BOTTOM_BAR                // day-number panels width (32px)
+    const SIDE_OUTER_L  = BOTTOM_BAR * 2            // left outer bar: months list (64px)
+    const SIDE_OUTER_R  = 120                       // right outer bar: wider for Arabic month names
+    const SIDE_TOTAL_L  = SIDE_INNER + SIDE_OUTER_L // total left margin (96px)
+    const SIDE_TOTAL_R  = SIDE_INNER + SIDE_OUTER_R // total right margin (152px)
+    const calibri       = "'Calibri', 'Calibri Light', 'Candara', 'Segoe UI', sans-serif"
+    const panelBg       = 'rgba(0,0,0,0.55)'
+    const hlColor       = '#000'
+    const dimColor      = 'rgba(255,255,255,1)'
+    const hlBg          = 'rgba(255, 200, 0, 0.85)'   // amber — used by side day panels
+
+    // ── Highlight colour helpers ──────────────────────────────────────────────
+
+    // Convert "H:MM" or "HH:MM" to total minutes since midnight
+    const toMins = (t) => {
+        if (!t) return 0
+        const [h, m] = t.split(':').map(Number)
+        return h * 60 + m
+    }
+
+    // Minutes from now until a future time (wraps midnight)
+    const minsUntil = (targetTime) => {
+        const nowMins = toMins(time)
+        const tMins   = toMins(targetTime)
+        return tMins >= nowMins ? tMins - nowMins : 1440 - nowMins + tMins
+    }
+
+    // Prayer bar: colour based on minutes remaining until this prayer's end
+    // (i.e. time until the NEXT prayer starts)
+    const prayerHlBg = (vakit) => {
+        if (!currentVakit || vakit.name !== currentVakit.name || vakit.time !== currentVakit.time)
+            return 'transparent'
+        const mins = minsUntil(nextVakit.time)
+        if (mins > 60)  return 'rgba(34, 197, 94, 0.85)'   // green  — >1 hour left
+        if (mins > 15)  return 'rgba(255, 200, 0, 0.85)'   // amber  — 15–60 min left
+        return             'rgba(239, 68, 68, 0.85)'        // red    — ≤15 min left
+    }
+
+    // Hour bar: colour based on minutes elapsed since the hour started
+    const hourHlBg = (h) => {
+        if (h !== currentHour) return 'transparent'
+        const minsPast = localNow.getMinutes()
+        if (minsPast < 30)  return 'rgba(34, 197, 94, 0.85)'   // green  — <30 min past
+        if (minsPast < 45)  return 'rgba(255, 200, 0, 0.85)'   // amber  — 30–45 min past
+        return                  'rgba(239, 68, 68, 0.85)'       // red    — ≥45 min past
+    }
+
+    // Right (Hijri day) bar: colour based on current prayer time
+    const hijriDayHlBg = (day) => {
+        if (day !== currentHijriDay) return 'transparent'
+        const name = currentVakit?.name
+        if (name === 'Asr')   return 'rgba(239, 68, 68, 0.85)'   // red   — Asr time
+        if (name === 'Dhuhr') return 'rgba(255, 200, 0, 0.85)'   // amber — Dhuhr time
+        return                    'rgba(34, 197, 94, 0.85)'       // green — all other times
+    }
+    const dayHlBg = (day) => {
+        if (day !== currentGregorianDay) return 'transparent'
+        const h = localNow.getHours()
+        if (h < 12)  return 'rgba(34, 197, 94, 0.85)'   // green  — before noon
+        if (h < 18)  return 'rgba(255, 200, 0, 0.85)'   // amber  — noon to 6pm
+        return           'rgba(239, 68, 68, 0.85)'       // red    — after 6pm
+    }
+
+    // Side-panel font: size each cell so 31 items fill the full available height
+    const sideCellHeight = `calc((100vh - ${TOP_BAR + BOTTOM_BAR}px) / 31)`
+    const sideFontSize   = `calc((100vh - ${TOP_BAR + BOTTOM_BAR}px) / 31 * 0.58)`
+    // Arabic prayer names (proper Arabic script)
+    const arabicNames = {
+        Fajr:    'الفجر',
+        Sunrise: 'الشروق',
+        Dhuhr:   'الظهر',
+        Asr:     'العصر',
+        Maghrib: 'المغرب',
+        Isha:    'العشاء',
+    }
+
+    // ── Top panel: prayer times (RTL — Fajr on right, Isha on left) ──────────
+    const TopPanel = () => {
+        const rtlVakits = vakits ? [...vakits].reverse() : []
+        // Responsive font: scales with viewport width, clamped between 11px and 28px
+        const prayerFont = `clamp(11px, ${TOP_BAR * 0.52}px, 2.2vw)`
+        const timeFont = "'Orbitron', 'Courier New', 'Lucida Console', monospace"
+        return (
+            <div style={{
+                position: 'fixed', top: 0, left: SIDE_TOTAL_L, right: SIDE_TOTAL_R, height: TOP_BAR,
+                background: panelBg, display: 'flex', alignItems: 'stretch',
+                overflow: 'hidden', zIndex: 100, fontFamily: calibri,
+            }}>
+                {rtlVakits.map((v, i) => {
+                    const isCurrent = currentVakit && v.name === currentVakit.name && v.time === currentVakit.time
+                    return (
+                        <div key={i} style={{
+                            flex: 1,
+                            display: 'flex', flexDirection: 'row',
+                            alignItems: 'center', justifyContent: 'center',
+                            padding: '0 8px',
+                            fontWeight: isCurrent ? 'bold' : 'normal',
+                            color: isCurrent ? hlColor : dimColor,
+                            background: prayerHlBg(v),
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            gap: 10,
+                        }}>
+                            {/* Arabic name */}
+                            <span style={{
+                                fontSize: prayerFont,
+                                direction: 'rtl',
+                                whiteSpace: 'nowrap',
+                            }}>
+                                {arabicNames[v.name] || v.name}
+                            </span>
+                            {/* Time — digital font + AM/PM superscript */}
+                            <span style={{
+                                display: 'inline-flex', alignItems: 'baseline',
+                                gap: 3, direction: 'ltr', whiteSpace: 'nowrap',
+                            }}>
+                                <span style={{
+                                    fontSize: prayerFont,
+                                    fontFamily: timeFont,
+                                    letterSpacing: '0.04em',
+                                }}>
+                                    {v.displayTime}
+                                </span>
+                                <span style={{
+                                    fontSize: `clamp(7px, ${TOP_BAR * 0.27}px, 1.1vw)`,
+                                    fontFamily: calibri,
+                                    letterSpacing: 0,
+                                    opacity: 0.85,
+                                }}>
+                                    {parseInt(v.time.split(':')[0], 10) < 12 ? 'AM' : 'PM'}
+                                </span>
+                            </span>
+                        </div>
+                    )
+                })}
+            </div>
+        )
+    }
+
+    // ── Bottom panel: days of week — English (left half) + Arabic (right half) ─
+    // localNow.getDay() → 0=Sun,1=Mon,...,6=Sat
+    const currentDayOfWeek = localNow.getDay()
+
+    // English days: Mon–Sun (index 0=Mon … 6=Sun, mapped to JS getDay 1–0)
+    const enDays = [
+        { label: 'Mon', jsDay: 1, weekend: false },
+        { label: 'Tue', jsDay: 2, weekend: false },
+        { label: 'Wed', jsDay: 3, weekend: false },
+        { label: 'Thu', jsDay: 4, weekend: false },
+        { label: 'Fri', jsDay: 5, weekend: false },
+        { label: 'Sat', jsDay: 6, weekend: true  },
+        { label: 'Sun', jsDay: 0, weekend: true  },
+    ]
+
+    // Arabic days: Al-Ahad (Sun) … Al-Sabt (Sat), ordered Sun–Sat to match Islamic week
+    // Friday (jsDay 5) is highlighted green; all others amber
+    const arDays = [
+        { label: 'الأحد',    jsDay: 0 },  // Al-Ahad   — Sunday
+        { label: 'الاثنين',  jsDay: 1 },  // Al-Ithnayn — Monday
+        { label: 'الثلاثاء', jsDay: 2 },  // Al-Thulatha — Tuesday
+        { label: 'الأربعاء', jsDay: 3 },  // Al-Arbi'a — Wednesday
+        { label: 'الخميس',   jsDay: 4 },  // Al-Khamis — Thursday
+        { label: 'الجمعة',   jsDay: 5 },  // Al-Jumu'a — Friday
+        { label: 'السبت',    jsDay: 6 },  // Al-Sabt   — Saturday
+    ]
+
+    const BottomPanel = () => (
+        <div style={{
+            position: 'fixed', bottom: 0, left: SIDE_TOTAL_L, right: SIDE_TOTAL_R, height: BOTTOM_BAR,
+            background: panelBg, display: 'flex', alignItems: 'stretch',
+            overflow: 'hidden', zIndex: 100,
+        }}>
+            {/* Left half — English Mon–Sun */}
+            <div style={{
+                flex: 1, display: 'flex', alignItems: 'stretch',
+                borderRight: '1px solid rgba(255,255,255,0.15)',
+                fontFamily: calibri,
+            }}>
+                {enDays.map(({ label, jsDay, weekend }) => {
+                    const isToday = jsDay === currentDayOfWeek
+                    const bg = isToday
+                        ? (weekend
+                            ? 'rgba(34, 197, 94, 0.85)'    // green  — weekend
+                            : 'rgba(255, 200, 0, 0.85)')   // amber  — weekday
+                        : 'transparent'
+                    return (
+                        <div key={label} style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 13,
+                            fontWeight: isToday ? 'bold' : 'normal',
+                            color: isToday ? hlColor : dimColor,
+                            background: bg,
+                            borderRadius: 3,
+                            whiteSpace: 'nowrap',
+                        }}>{label}</div>
+                    )
+                })}
+            </div>
+
+            {/* Right half — Arabic days (Sun–Sat, Islamic order) */}
+            <div style={{
+                flex: 1, display: 'flex', alignItems: 'stretch',
+                fontFamily: calibri,
+                direction: 'rtl',
+            }}>
+                {arDays.map(({ label, jsDay }) => {
+                    const isToday = jsDay === currentDayOfWeek
+                    const isFriday = jsDay === 5
+                    const bg = isToday
+                        ? (isFriday
+                            ? 'rgba(34, 197, 94, 0.85)'    // green  — Friday
+                            : 'rgba(255, 200, 0, 0.85)')   // amber  — other days
+                        : 'transparent'
+                    return (
+                        <div key={label} style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 16,
+                            fontWeight: isToday ? 'bold' : 'normal',
+                            color: isToday ? hlColor : dimColor,
+                            background: bg,
+                            borderRadius: 3,
+                            whiteSpace: 'nowrap',
+                        }}>{label}</div>
+                    )
+                })}
+            </div>
+        </div>
+    )
+    // ── Left panel: Gregorian days of month ───────────────────────────────────
+    const LeftPanel = () => (
+        <div style={{
+            position: 'fixed', top: TOP_BAR, left: SIDE_OUTER_L, bottom: BOTTOM_BAR, width: SIDE_INNER,
+            background: panelBg, display: 'flex', flexDirection: 'column',
+            alignItems: 'stretch', overflow: 'hidden', zIndex: 100, fontFamily: calibri,
+        }}>
+            {Array.from({ length: daysInMonth }, (_, i) => {
+                const day = i + 1
+                const isToday = day === currentGregorianDay
+                return (
+                    <div key={day} style={{
+                        height: sideCellHeight, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '100%',
+                        fontSize: sideFontSize,
+                        fontWeight: isToday ? 'bold' : 'normal',
+                        color: isToday ? hlColor : dimColor,
+                        background: dayHlBg(day),
+                        borderRadius: 3,
+                    }}>{day}</div>
+                )
+            })}
+        </div>
+    )
+
+    // ── Right panel: Hijri days of month ──────────────────────────────────────
+    const RightPanel = () => (
+        <div style={{
+            position: 'fixed', top: TOP_BAR, right: SIDE_OUTER_R, bottom: BOTTOM_BAR, width: SIDE_INNER,
+            background: panelBg, display: 'flex', flexDirection: 'column',
+            alignItems: 'stretch', overflow: 'hidden', zIndex: 100, fontFamily: calibri,
+        }}>
+            {Array.from({ length: daysInHijriMonth }, (_, i) => {
+                const day = i + 1
+                const isToday = day === currentHijriDay
+                return (
+                    <div key={day} style={{
+                        height: sideCellHeight, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        width: '100%',
+                        fontSize: sideFontSize,
+                        fontWeight: isToday ? 'bold' : 'normal',
+                        color: isToday ? hlColor : dimColor,
+                        background: hijriDayHlBg(day),
+                        borderRadius: 3,
+                    }}>{day}</div>
+                )
+            })}
+        </div>
+    )
+
     return (
-        <div className='d-flex flex-row h-100 align-items-center justify-content-center'
-            style={{ overflow: 'hidden' }}>
-            <div ref={driftRef}>
-                <div ref={dragWrapperRef}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onClick={handleClick}
-                    style={{ touchAction: 'none', cursor: 'grab' }}>
-                    <canvas id="clockCanvas" className="img-fluid"
-                        style={{ opacity: clockOpacity, transform: deviceSettings.zoomedIn === 'Y' ? 'scale(2.2) translateY(-3%)' : 'none' }}
-                        width={size} height={size} ref={canvasRef} ></canvas>
+        <>
+            {/* Top-left corner: AzanClock two lines */}
+            <div style={{
+                position: 'fixed', top: 0, left: 0,
+                width: SIDE_TOTAL_L, height: TOP_BAR,
+                background: 'black', color: 'white',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                zIndex: 101, overflow: 'hidden',
+                lineHeight: 1.1,
+            }}>
+                <span style={{
+                    fontFamily: calibri,
+                    fontSize: `clamp(10px, ${TOP_BAR * 0.38}px, 1.8vw)`,
+                    fontWeight: 'bold',
+                    letterSpacing: 2,
+                    whiteSpace: 'nowrap',
+                }}>AZAN</span>
+                <span style={{
+                    fontFamily: calibri,
+                    fontSize: `clamp(10px, ${TOP_BAR * 0.38}px, 1.8vw)`,
+                    fontWeight: 'bold',
+                    letterSpacing: 2,
+                    whiteSpace: 'nowrap',
+                }}>CLOCK</span>
+            </div>
+
+            {/* Top-right corner: نور الصلاة */}
+            <div style={{
+                position: 'fixed', top: 0, right: 0,
+                width: SIDE_TOTAL_R, height: TOP_BAR,
+                background: 'black', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 101, overflow: 'hidden',
+            }}>
+                <span style={{
+                    fontFamily: calibri,
+                    fontSize: `clamp(12px, ${TOP_BAR * 0.46}px, 2vw)`,
+                    fontWeight: 'bold',
+                    whiteSpace: 'nowrap',
+                    direction: 'rtl',
+                }}>نور الصلاة</span>
+            </div>
+
+            {/* Bottom-left corner: current Gregorian year, straight */}
+            <div style={{
+                position: 'fixed', bottom: 0, left: 0,
+                width: SIDE_TOTAL_L, height: BOTTOM_BAR,
+                background: 'black', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 101, overflow: 'hidden',
+            }}>
+                <span style={{
+                    fontFamily: calibri,
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    letterSpacing: 2,
+                    whiteSpace: 'nowrap',
+                }}>{currentGregorianYear}</span>
+            </div>
+
+            {/* Bottom-right corner: current Hijri year, straight */}
+            <div style={{
+                position: 'fixed', bottom: 0, right: 0,
+                width: SIDE_TOTAL_R, height: BOTTOM_BAR,
+                background: 'black', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 101, overflow: 'hidden',
+            }}>
+                <span style={{
+                    fontFamily: calibri,
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    letterSpacing: 2,
+                    whiteSpace: 'nowrap',
+                }}>{currentHijriYear}</span>
+            </div>
+
+            {/* Outer left bar: months of the year Jan–Dec with day-progress highlight */}
+            <div style={{
+                position: 'fixed', top: TOP_BAR, left: 0, bottom: BOTTOM_BAR,
+                width: SIDE_OUTER_L,
+                background: 'rgba(0,0,0,0.7)',
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'stretch', overflow: 'hidden', zIndex: 100,
+                fontFamily: calibri,
+            }}>
+                {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((name, i) => {
+                    const isCurrent = i === currentGregorianMonth
+                    const d = currentGregorianDay
+                    const bg = !isCurrent ? 'transparent'
+                        : d <= 10 ? 'rgba(34, 197, 94, 0.85)'
+                        : d <= 20 ? 'rgba(255, 200, 0, 0.85)'
+                        : 'rgba(239, 68, 68, 0.85)'
+                    return (
+                        <div key={i} style={{
+                            flex: 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: `calc((100vh - ${TOP_BAR + BOTTOM_BAR}px) / 12 * 0.42)`,
+                            fontWeight: isCurrent ? 'bold' : 'normal',
+                            color: isCurrent ? hlColor : dimColor,
+                            background: bg,
+                            borderRadius: 3,
+                        }}>{name}</div>
+                    )
+                })}
+            </div>
+
+            {/* Outer right bar: Islamic months in Arabic, Muharram–Dhul Hijjah */}
+            <div style={{
+                position: 'fixed', top: TOP_BAR, right: 0, bottom: BOTTOM_BAR,
+                width: SIDE_OUTER_R,
+                background: 'rgba(0,0,0,0.7)',
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'stretch', overflow: 'hidden', zIndex: 100,
+                fontFamily: calibri,
+            }}>
+                {[
+                    'مُحَرَّم','صَفَر','رَبيع الأوَّل','رَبيع الثاني',
+                    'جُمادى الأولى','جُمادى الآخِرة','رَجَب','شَعبان',
+                    'رَمَضان','شَوَّال','ذو القَعدة','ذو الحِجَّة'
+                ].map((name, i) => {
+                    const isCurrent = i === (currentHijriMonth - 1)
+                    const d = currentHijriDay
+                    const bg = !isCurrent ? 'transparent'
+                        : d <= 10 ? 'rgba(34, 197, 94, 0.85)'
+                        : d <= 20 ? 'rgba(255, 200, 0, 0.85)'
+                        : 'rgba(239, 68, 68, 0.85)'
+                    return (
+                        <div key={i} style={{
+                            flex: 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: `calc((100vh - ${TOP_BAR + BOTTOM_BAR}px) / 12 * 0.30)`,
+                            fontWeight: isCurrent ? 'bold' : 'normal',
+                            color: isCurrent ? hlColor : dimColor,
+                            background: bg,
+                            borderRadius: 3,
+                            direction: 'rtl',
+                            textAlign: 'center',
+                            padding: '0 2px',
+                            whiteSpace: 'nowrap',
+                        }}>{name}</div>
+                    )
+                })}
+            </div>
+
+            <TopPanel />
+            <BottomPanel />
+            <LeftPanel />
+            <RightPanel />
+            <div className='d-flex flex-row h-100 align-items-center justify-content-center'
+                style={{ overflow: 'hidden', paddingTop: TOP_BAR, paddingBottom: BOTTOM_BAR, paddingLeft: SIDE_TOTAL_L, paddingRight: SIDE_TOTAL_R }}>
+                <div ref={driftRef}>
+                    <div ref={dragWrapperRef}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onClick={handleClick}
+                        style={{ touchAction: 'none', cursor: 'grab' }}>
+                        <canvas id="clockCanvas" className="img-fluid"
+                            style={{ opacity: clockOpacity, transform: deviceSettings.zoomedIn === 'Y' ? 'scale(2.2) translateY(-3%)' : 'none' }}
+                            width={size} height={size} ref={canvasRef} ></canvas>
+                    </div>
                 </div>
             </div>
-        </div >
+        </>
     );
 }
