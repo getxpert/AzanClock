@@ -601,7 +601,7 @@ export default function Clock() {
     // Arabic prayer names (proper Arabic script)
     const arabicNames = {
         Fajr:    'الفجر',
-        Sunrise: 'الشروق',
+        Sunrise: 'الضحى',
         Dhuhr:   'الظهر',
         Asr:     'العصر',
         Maghrib: 'المغرب',
@@ -864,14 +864,14 @@ export default function Clock() {
                     fontWeight: 'bold',
                     letterSpacing: 2,
                     whiteSpace: 'nowrap',
-                }}>NurAs</span>
+                }}>SALAH</span>
                 <span style={{
                     fontFamily: calibri,
                     fontSize: `clamp(10px, ${TOP_BAR * 0.38}px, 1.8vw)`,
                     fontWeight: 'bold',
                     letterSpacing: 2,
                     whiteSpace: 'nowrap',
-                }}>Salah</span>
+                }}>TIMES</span>
             </div>
 
             {/* Top-right corner: نور الصلاة */}

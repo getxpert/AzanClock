@@ -94,9 +94,24 @@ export const SmartAzanClock = {
             + ' ' +
             nD.toLocaleString("en-US", { timeZone: this.settings.locationSettings.timeZoneID, month: 'long', year: 'numeric' });
 
-        let hijriDay = nD.toLocaleDateString('en-SA-u-ca-islamic-umalqura', { timeZone: this.settings.locationSettings.timeZoneID, day: 'numeric' });
-        let hijriMonth = nD.toLocaleDateString('en-SA-u-ca-islamic-umalqura', { timeZone: this.settings.locationSettings.timeZoneID, month: 'numeric' });
-        let hijriYear = nD.toLocaleDateString('en-SA-u-ca-islamic-umalqura', { timeZone: this.settings.locationSettings.timeZoneID, year: 'numeric' });
+        // Calculate intelligent dimming based on sunrise/sunset times
+        const sunriseTime = this.getPrayerTime('sunrise');
+        const sunsetTime = this.getPrayerTime('sunset');
+        const dimmingConfig = getDimmingConfig(this.currentTimeString, sunriseTime, sunsetTime);
+
+        // Islamic date changes at sunset, not midnight.
+        // If current time is between sunset and midnight, advance the date by one day
+        // so the displayed Hijri date reflects the new Islamic day that has already begun.
+        const midnightTimeStr = this.getPrayerTime('midnight');
+        const isAfterSunsetBeforeMidnight = isTimeBetweenTheTwo(this.currentTimeString, sunsetTime, midnightTimeStr);
+        const newND = isAfterSunsetBeforeMidnight
+            ? new Date(nD.getTime() + 24 * 60 * 60 * 1000)
+            : nD;
+
+        let hijriDay = newND.toLocaleDateString('en-SA-u-ca-islamic-umalqura', { timeZone: this.settings.locationSettings.timeZoneID, day: 'numeric' });
+        let hijriMonth = newND.toLocaleDateString('en-SA-u-ca-islamic-umalqura', { timeZone: this.settings.locationSettings.timeZoneID, month: 'numeric' });
+        let hijriYear = newND.toLocaleDateString('en-SA-u-ca-islamic-umalqura', { timeZone: this.settings.locationSettings.timeZoneID, year: 'numeric' });
+        
         this.output.hijriDate = hijriDay + ' ' + HijriMonths[hijriMonth - 1] + ' ' + hijriYear.replace(/\D/g, '');
         this.output.nextText = nextText;
         this.output.time = this.currentTimeString;
@@ -117,10 +132,7 @@ export const SmartAzanClock = {
         this.output.oneThirdAngle = (TimeToRadians(this.getPrayerTime('maghrib'), 24) + oneThird * Math.PI / 720) % (2 * Math.PI);
         this.output.twoThirdAngle = (TimeToRadians(this.getPrayerTime('maghrib'), 24) + twoThird * Math.PI / 720) % (2 * Math.PI);
 
-        // Calculate intelligent dimming based on sunrise/sunset times
-        const sunriseTime = this.getPrayerTime('sunrise');
-        const sunsetTime = this.getPrayerTime('sunset');
-        const dimmingConfig = getDimmingConfig(this.currentTimeString, sunriseTime, sunsetTime);
+       
         
         // Store dimming information for use by Clock component
         this.output.dimmingConfig = dimmingConfig;
