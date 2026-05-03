@@ -118,12 +118,7 @@ export default function Clock() {
         if (currentArcVakit.name != 'Duhaend')
             sac.print(ctx, currentArcVakit.name, 37, white, -191);
 
-        // Moon phase below centre (location moved to HTML overlay)
-        if (weatherData) {
-            if (weatherData.moonPhase) {
-                sac.drawMoon(ctx, weatherData.moonPhase.cyclePosition, weatherData.moonPhase.name, 345);
-            }
-        }
+
 
     })
 
@@ -382,92 +377,6 @@ export default function Clock() {
             }
             return sac;
         },
-        // Draw a greyscale moon using canvas geometry.
-        // cyclePosition: 0–1 (0 = new moon, 0.5 = full moon)
-        // phaseName: label shown below the moon
-        // cy: vertical centre offset from canvas centre (positive = down)
-        drawMoon: (ctx, cyclePosition, phaseName, cy) => {
-            const r = 36;           // moon radius — matches weather icon visual size
-            const cx = 0;           // horizontally centred
-            const centerY = size / 2 + cy;
-            const centerX = size / 2 + cx;
-
-            ctx.save();
-
-            // Dark disc (unlit face)
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
-            ctx.fillStyle = '#222';
-            ctx.fill();
-
-            // Lit portion — greyscale crescent / gibbous overlay
-            // cyclePosition 0→0.5 = waxing (right side lit), 0.5→1 = waning (left side lit)
-            const waxing = cyclePosition <= 0.5;
-            // Map 0–0.5 → 0–1 (waxing) and 0.5–1 → 1–0 (waning)
-            const phase = waxing ? cyclePosition * 2 : (1 - cyclePosition) * 2;
-
-            // The lit ellipse x-radius: 0 = new (line), 1 = full (circle)
-            // For crescent: inner ellipse is dark, outer is lit
-            // For gibbous:  inner ellipse is lit, outer is lit
-            const isGibbous = phase > 0.5;
-            const ellipseRx = isGibbous
-                ? r * (2 * phase - 1)   // 0→r as phase goes 0.5→1
-                : r * (1 - 2 * phase);  // r→0 as phase goes 0→0.5
-
-            // Clip to the moon disc
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
-            ctx.clip();
-
-            if (isGibbous) {
-                // Paint the whole visible half lit, then mask out the dark ellipse
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, r, -Math.PI / 2, Math.PI / 2, waxing ? false : true);
-                ctx.closePath();
-                ctx.fillStyle = '#ddd';
-                ctx.fill();
-
-                // Dark inner ellipse (shadow side)
-                ctx.beginPath();
-                ctx.ellipse(centerX, centerY, ellipseRx, r, 0, 0, Math.PI * 2);
-                ctx.fillStyle = '#222';
-                ctx.fill();
-            } else {
-                // Crescent: lit half-disc minus dark inner ellipse
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, r, -Math.PI / 2, Math.PI / 2, waxing ? false : true);
-                ctx.closePath();
-                ctx.fillStyle = '#ddd';
-                ctx.fill();
-
-                // Dark inner ellipse covers most of the lit half → thin crescent remains
-                ctx.beginPath();
-                ctx.ellipse(centerX, centerY, ellipseRx, r, 0, 0, Math.PI * 2);
-                ctx.fillStyle = '#222';
-                ctx.fill();
-            }
-
-            // Subtle rim highlight
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            ctx.restore();
-
-            // Phase name label below the moon
-            ctx.save();
-            ctx.translate(size / 2, size / 2);
-            ctx.font = '18px Arial';
-            ctx.fillStyle = 'rgba(200,200,200,0.9)';
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'center';
-            ctx.fillText(phaseName, 0, cy + r + 16);
-            ctx.restore();
-
-            return sac;
-        }
     }
 
     const updateBackground = (bg) => {
@@ -831,6 +740,10 @@ export default function Clock() {
         return (config.default) || { unit: 'white', number: 'white' };
     };
 
+    // After sunset (Maghrib, Isha, Imsak) show moon phase PNG instead of weather emoji
+    const afterSunset = currentVakit &&
+        (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
+
     const weatherIcon = weatherData ? (() => {
         const code = weatherData.weatherCode;
         if (code === 0)                          return '☀️';
@@ -1057,7 +970,7 @@ export default function Clock() {
             })()}
 
             {/* Weather overlay — top-left corner of the clock viewport area */}
-            {weatherData && weatherIcon && (() => {
+            {weatherData && (weatherIcon || afterSunset) && (() => {
                 const tempColours = getTempColours(weatherData.temperature);
                 const toTitleCase = (str) => str
                     ? str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -1080,11 +993,25 @@ export default function Clock() {
                     }}>
                         {/* Icon + temperature on one row */}
                         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.4em' }}>
-                            <span style={{
-                                fontSize: 'clamp(72px, 11vw, 140px)',
-                                lineHeight: 1,
-                                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 4px 12px rgba(0,0,0,0.85)) drop-shadow(0 0 20px rgba(0,0,0,0.7))',
-                            }}>{weatherIcon}</span>
+                            {afterSunset ? (
+                                /* Moon phase PNG — filename matches Islamic day of month */
+                                <img
+                                    src={`/moon/${currentHijriDay}.png`}
+                                    alt={`Moon day ${currentHijriDay}`}
+                                    style={{
+                                        width: 'clamp(72px, 11vw, 140px)',
+                                        height: 'clamp(72px, 11vw, 140px)',
+                                        objectFit: 'contain',
+                                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 4px 12px rgba(0,0,0,0.85)) drop-shadow(0 0 20px rgba(0,0,0,0.7))',
+                                    }}
+                                />
+                            ) : (
+                                <span style={{
+                                    fontSize: 'clamp(72px, 11vw, 140px)',
+                                    lineHeight: 1,
+                                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 4px 12px rgba(0,0,0,0.85)) drop-shadow(0 0 20px rgba(0,0,0,0.7))',
+                                }}>{weatherIcon}</span>
+                            )}
                             <span style={{
                                 fontFamily: "'Orbitron', 'Courier New', monospace",
                                 fontSize: 'clamp(42px, 6.5vw, 88px)',
