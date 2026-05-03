@@ -1,0 +1,13 @@
+{
+  "comment": "Temperature colour bands for the weather overlay. Each band applies when temp >= min (and < the next band's min). The 'unit' colour applies to the °C symbol; the 'number' colour applies to the numeric value. Bands must be sorted descending by 'min'.",
+  "bands": [
+    { "min": 35,  "label": "Extremely Hot",    "unit": "#8B0000", "number": "white" },
+    { "min": 25,  "label": "Very Warm",         "unit": "#FF6600", "number": "white" },
+    { "min": 16,  "label": "Warm / Mild",       "unit": "#FFD700", "number": "white" },
+    { "min": 11,  "label": "Cool",              "unit": "#22C55E", "number": "white" },
+    { "min": 4,   "label": "Cold",              "unit": "#3B82F6", "number": "white" },
+    { "min": 0,   "label": "Very Cold",         "unit": "#8B5CF6", "number": "white" },
+    { "min": -999,"label": "Freezing",          "unit": "#8B5CF6", "number": "white" }
+  ],
+  "default": { "unit": "white", "number": "white" }
+}

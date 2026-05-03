@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useRef } from 'react'
 import { AppContext } from '../AppContext';
 import { format12 } from '../scripts/SmartAzanClock'
 import { HijriMonths } from '../data/Common'
+import tempColourConfig from '../data/temperatureColours.json'
 
 export default function Clock() {
 
@@ -117,28 +118,8 @@ export default function Clock() {
         if (currentArcVakit.name != 'Duhaend')
             sac.print(ctx, currentArcVakit.name, 37, white, -191);
 
-        // Weather — temperature + icon at the top of the dial, moon phase + location below centre
+        // Moon phase below centre (location moved to HTML overlay)
         if (weatherData) {
-            const weatherIcon = (() => {
-                const code = weatherData.weatherCode;
-                if (code === 0)                          return '☀️';   // Clear
-                if (code === 1)                          return '🌤️';  // Mainly Clear
-                if (code === 2)                          return '⛅';   // Partly Cloudy
-                if (code === 3)                          return '☁️';   // Overcast
-                if (code === 45 || code === 48)          return '🌫️';  // Fog
-                if (code >= 51 && code <= 57)            return '🌦️';  // Drizzle
-                if (code >= 61 && code <= 67)            return '🌧️';  // Rain
-                if (code >= 71 && code <= 77)            return '❄️';   // Snow
-                if (code >= 80 && code <= 82)            return '🌧️';  // Showers
-                if (code >= 85 && code <= 86)            return '🌨️';  // Snow Showers
-                if (code >= 95 && code <= 99)            return '⛈️';  // Thunderstorm
-                return '🌡️';
-            })();
-            // Large temperature + icon at the top of the dial (~y = -310)
-            sac.print(ctx, `${weatherIcon} ${weatherData.temperature}°C`, 72, white, -310);
-            if (locationSettings && locationSettings.address) {
-                sac.print(ctx, locationSettings.address, 24, white, -230);
-            }
             if (weatherData.moonPhase) {
                 sac.drawMoon(ctx, weatherData.moonPhase.cyclePosition, weatherData.moonPhase.name, 345);
             }
@@ -831,6 +812,41 @@ export default function Clock() {
         </div>
     )
 
+    // ── Weather icon + temperature overlay (top-left of clock area) ─────────
+
+    // Resolve colour bands from the external JSON config (sorted descending by min)
+    // localStorage key 'temperatureColours' overrides the bundled default
+    const getTempColours = (temp) => {
+        let config = tempColourConfig;
+        try {
+            const stored = localStorage.getItem('temperatureColours');
+            if (stored) config = JSON.parse(stored);
+        } catch (e) { /* ignore */ }
+        const bands = (config.bands || []).slice().sort((a, b) => b.min - a.min);
+        for (const band of bands) {
+            if (temp >= band.min) {
+                return { unit: band.unit, number: band.number };
+            }
+        }
+        return (config.default) || { unit: 'white', number: 'white' };
+    };
+
+    const weatherIcon = weatherData ? (() => {
+        const code = weatherData.weatherCode;
+        if (code === 0)                          return '☀️';
+        if (code === 1)                          return '🌤️';
+        if (code === 2)                          return '⛅';
+        if (code === 3)                          return '☁️';
+        if (code === 45 || code === 48)          return '🌫️';
+        if (code >= 51 && code <= 57)            return '🌦️';
+        if (code >= 61 && code <= 67)            return '🌧️';
+        if (code >= 71 && code <= 77)            return '❄️';
+        if (code >= 80 && code <= 82)            return '🌧️';
+        if (code >= 85 && code <= 86)            return '🌨️';
+        if (code >= 95 && code <= 99)            return '⛈️';
+        return '🌡️';
+    })() : null;
+
     return (
         <>
             {/* Top-left corner: AzanClock two lines */}
@@ -848,14 +864,14 @@ export default function Clock() {
                     fontWeight: 'bold',
                     letterSpacing: 2,
                     whiteSpace: 'nowrap',
-                }}>AZAN</span>
+                }}>NurAs</span>
                 <span style={{
                     fontFamily: calibri,
                     fontSize: `clamp(10px, ${TOP_BAR * 0.38}px, 1.8vw)`,
                     fontWeight: 'bold',
                     letterSpacing: 2,
                     whiteSpace: 'nowrap',
-                }}>CLOCK</span>
+                }}>Salah</span>
             </div>
 
             {/* Top-right corner: نور الصلاة */}
@@ -981,6 +997,97 @@ export default function Clock() {
             <BottomPanel />
             <LeftPanel />
             <RightPanel />
+
+            {/* Weather overlay — top-left corner of the clock viewport area */}
+            {weatherData && weatherIcon && (() => {
+                const tempColours = getTempColours(weatherData.temperature);
+                const toTitleCase = (str) => str
+                    ? str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                    : null;
+                const locationAddress = toTitleCase(locationSettings?.address) || null;
+                const locationCountry = toTitleCase(weatherData.country) || null;
+                return (
+                    <div style={{
+                        position: 'fixed',
+                        top: TOP_BAR,
+                        left: SIDE_TOTAL_L,
+                        zIndex: 99,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        justifyContent: 'flex-start',
+                        padding: '14px 18px',
+                        pointerEvents: 'none',
+                        lineHeight: 1.1,
+                    }}>
+                        {/* Icon + temperature on one row */}
+                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.4em' }}>
+                            <span style={{
+                                fontSize: 'clamp(72px, 11vw, 140px)',
+                                lineHeight: 1,
+                                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 4px 12px rgba(0,0,0,0.85)) drop-shadow(0 0 20px rgba(0,0,0,0.7))',
+                            }}>{weatherIcon}</span>
+                            <span style={{
+                                fontFamily: "'Orbitron', 'Courier New', monospace",
+                                fontSize: 'clamp(42px, 6.5vw, 88px)',
+                                fontWeight: 'bold',
+                                textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
+                                letterSpacing: '0.04em',
+                                lineHeight: 1,
+                            }}>
+                                {/* Number stays white, °C gets the band colour */}
+                                <span style={{ color: tempColours.number }}>{weatherData.temperature}</span>
+                                <span style={{ color: tempColours.unit }}>°C</span>
+                            </span>
+                        </div>
+                        {/* Divider line */}
+                        <div style={{
+                            width: '100%',
+                            height: 2,
+                            background: 'rgba(255,255,255,0.35)',
+                            borderRadius: 1,
+                            margin: '10px 0 8px 0',
+                        }} />
+                        {/* Location: address on first line, country on second */}
+                        {locationAddress && (
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 2,
+                            }}>
+                                <span style={{
+                                    fontFamily: "'Orbitron', 'Courier New', monospace",
+                                    fontSize: 'clamp(18px, 2.6vw, 42px)',
+                                    fontWeight: 'bold',
+                                    color: 'white',
+                                    textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
+                                    letterSpacing: '0.03em',
+                                    lineHeight: 1.2,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: 'calc(100vw - 220px)',
+                                }}>{locationAddress}</span>
+                                {locationCountry && (
+                                    <span style={{
+                                        fontFamily: "'Orbitron', 'Courier New', monospace",
+                                        fontSize: 'clamp(18px, 2.6vw, 42px)',
+                                        fontWeight: 'bold',
+                                        color: 'white',
+                                        textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
+                                        letterSpacing: '0.03em',
+                                        lineHeight: 1.2,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: 'calc(100vw - 220px)',
+                                    }}>{locationCountry}</span>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                );
+            })()}
             <div className='d-flex flex-row h-100 align-items-center justify-content-center'
                 style={{ overflow: 'hidden', paddingTop: TOP_BAR, paddingBottom: BOTTOM_BAR, paddingLeft: SIDE_TOTAL_L, paddingRight: SIDE_TOTAL_R }}>
                 <div ref={driftRef}>

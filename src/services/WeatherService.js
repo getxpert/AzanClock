@@ -119,6 +119,19 @@ class WeatherService {
             // Calculate moon phase
             const moonPhase = this.calculateMoonPhase();
 
+            // Reverse-geocode to get country name (Nominatim, free, no key required)
+            let country = this.lastSuccessfulData?.country || null;
+            try {
+                const geoUrl = `https://nominatim.openstreetmap.org/reverse?lat=${this.lat}&lon=${this.lng}&format=json&zoom=3&addressdetails=1`;
+                const geoResp = await fetch(geoUrl, { headers: { 'Accept-Language': 'en' } });
+                if (geoResp.ok) {
+                    const geoData = await geoResp.json();
+                    country = geoData?.address?.country || null;
+                }
+            } catch (geoErr) {
+                console.warn('WeatherService: Reverse geocode failed', geoErr);
+            }
+
             // Extract weather data
             const weatherData = {
                 temperature: Math.round(data.current.temperature_2m),
@@ -126,6 +139,7 @@ class WeatherService {
                 weatherCode: data.current.weather_code,
                 description: this.getWeatherDescription(data.current.weather_code),
                 moonPhase: moonPhase,
+                country: country,
                 timestamp: new Date().toISOString(),
                 success: true
             };

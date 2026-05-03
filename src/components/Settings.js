@@ -1,4 +1,4 @@
-import React, { useContext, createRef, useRef, useEffect } from 'react'
+import React, { useContext, createRef, useRef, useEffect, useState } from 'react'
 import Address from './Address';
 import DropDown from './DropDown';
 import Options from './Options';
@@ -9,11 +9,22 @@ import { CalculationMethods, AsrCalculationMethods } from '../data/CalculationMe
 import { AppContext } from '../AppContext';
 import { FontAwesome } from '../data/FontAwesome';
 import { format12 } from '../scripts/SmartAzanClock';
+import defaultTempColours from '../data/temperatureColours.json';
 
 export default function Settings() {
 
     const { vakits, arcVakits, calculationSettings, locationSettings, deviceSettings, azanSettings,
         offsetSettings, updateOffset, previewAudio, oneThirdTime, twoThirdTime, midnightTime } = useContext(AppContext)
+
+    // Load temperature colour bands from localStorage (falls back to bundled defaults)
+    const loadTempColours = () => {
+        try {
+            const stored = localStorage.getItem('temperatureColours');
+            if (stored) return JSON.parse(stored);
+        } catch (e) { /* ignore */ }
+        return defaultTempColours;
+    };
+    const [tempColours, setTempColours] = useState(loadTempColours);
 
     const CalculationMethodValues = [];
     Object.keys(CalculationMethods).forEach(k => {
@@ -115,6 +126,46 @@ export default function Settings() {
                 <div className='badge bg-secondary p-1'>1/3 @ {format12(oneThirdTime)}</div>
                 <div className='badge bg-secondary p-1'>Midnight @ {format12(midnightTime)}</div>
                 <div className='badge bg-secondary p-1'>2/3 @ {format12(twoThirdTime)}</div>
+            </div>
+
+            {/* ── Temperature Colour Bands ─────────────────────────────────── */}
+            <div className="mt-3">
+                <span className='badge mb-2 p-0'>Temperature Colour Bands (°C symbol)</span>
+                <div style={{ fontSize: '0.8rem' }}>
+                    {tempColours.bands.map((band, i) => (
+                        <div key={i} className='d-flex flex-row align-items-center gap-2 mb-1'>
+                            <span style={{ width: 60, color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
+                                {band.min === -999 ? '< 0' : `≥ ${band.min}`}°C
+                            </span>
+                            <span style={{
+                                flex: 1,
+                                color: 'rgba(255,255,255,0.75)',
+                                fontSize: '0.75rem',
+                            }}>{band.label}</span>
+                            {/* Unit colour swatch + picker */}
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>°C</span>
+                                <span style={{
+                                    display: 'inline-block', width: 22, height: 22,
+                                    borderRadius: 4, border: '1px solid rgba(255,255,255,0.3)',
+                                    background: band.unit, cursor: 'pointer',
+                                }} />
+                                <input type='color' value={band.unit}
+                                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                                    onChange={(e) => {
+                                        const updated = { ...tempColours, bands: tempColours.bands.map((b, j) => j === i ? { ...b, unit: e.target.value } : b) };
+                                        setTempColours(updated);
+                                        localStorage.setItem('temperatureColours', JSON.stringify(updated));
+                                    }} />
+                            </label>
+                        </div>
+                    ))}
+                    <button className='btn btn-sm btn-outline-secondary mt-1'
+                        onClick={() => {
+                            setTempColours(defaultTempColours);
+                            localStorage.removeItem('temperatureColours');
+                        }}>Reset to defaults</button>
+                </div>
             </div>
 
         </div >
