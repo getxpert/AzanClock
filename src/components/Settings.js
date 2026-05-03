@@ -112,6 +112,16 @@ export default function Settings() {
             </div>
 
             <div className="mt-2">
+                <span className='badge mb-1 p-0'>Clock Style</span>
+                <Options name="deviceSettings.clockStyle" selectedValue={deviceSettings.clockStyle}
+                    values={[
+                        { id: 'A', name: '🕐 Analogue' },
+                        { id: 'D', name: '🔢 Digital'  },
+                        { id: 'B', name: '⊕ Both'     },
+                    ]} />
+            </div>
+
+            <div className="mt-2">
                 <span className='badge mb-1 p-0'>Enable Azan Calls & Alarms</span>
                 <Options name="deviceSettings.azanCallsEnabled" selectedValue={deviceSettings.azanCallsEnabled} values={AzanCallOptions} />
             </div>

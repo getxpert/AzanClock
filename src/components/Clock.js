@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import { AppContext } from '../AppContext';
 import { format12 } from '../scripts/SmartAzanClock'
 import { HijriMonths } from '../data/Common'
@@ -13,6 +13,21 @@ export default function Clock() {
     const driftRef = useRef(null)
     const dragWrapperRef = useRef(null)
     const dragRef = useRef({ isDragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0, hasMoved: false })
+
+    // Pre-load hand PNGs once — reused every canvas redraw
+    const hourImgRef   = useRef(null)
+    const minuteImgRef = useRef(null)
+    useEffect(() => {
+        const h = new Image(); h.src = '/hourhand.png';   hourImgRef.current   = h
+        const m = new Image(); m.src = '/minutehand.png'; minuteImgRef.current = m
+    }, [])
+
+    // Tick every second so the canvas redraws and the second hand moves
+    const [, setTick] = useState(0)
+    useEffect(() => {
+        const id = setInterval(() => setTick(t => t + 1), 1000)
+        return () => clearInterval(id)
+    }, [])
 
     const handlePointerDown = (e) => {
         const drag = dragRef.current
@@ -56,6 +71,18 @@ export default function Clock() {
     const white = 'whitesmoke';
     const silver = 'silver';
 
+    // Arabic prayer names used both on canvas and in the top panel
+    const arabicPrayerNames = {
+        Imsak:   'الإمساك',
+        Fajr:    'الفجر',
+        Sunrise: 'الضحى',
+        Duha:    'الضحى',
+        Dhuhr:   'الظهر',
+        Asr:     'العصر',
+        Maghrib: 'المغرب',
+        Isha:    'العشاء',
+    }
+
     useEffect(() => {
         const el = driftRef.current
         if (!el) return
@@ -94,6 +121,10 @@ export default function Clock() {
 
         updateBackground(background);
 
+        const clockStyle = deviceSettings.clockStyle || 'A'
+        const showDigital  = clockStyle === 'D' || clockStyle === 'B'
+        const showAnalogue = clockStyle === 'A' || clockStyle === 'B'
+
         sac.clearCanvas(ctx)
             .fillCircle(ctx, 490, 0, 0, white, 0.33)
             .fillCircle(ctx, 488, 0, 0, black)
@@ -109,14 +140,20 @@ export default function Clock() {
             .drawArrow(ctx, hourAngle, 479, 41, 59, black)
             .drawArrow(ctx, hourAngle, 479, 41, 56, white)
             .drawCircle(ctx, 482, black, 9)
-            .print(ctx, displayTime, 250, white, -27)
-            .print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
+
+        if (showDigital) {
+            sac.print(ctx, displayTime, 250, white, -27)
+        }
+
+        sac.print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
             .print(ctx, nextText, 156, white, 223)
             .updateTitle(ctx, 'AzanClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)
 
-
         if (currentArcVakit.name != 'Duhaend')
-            sac.print(ctx, currentArcVakit.name, 37, white, -191);
+            sac.print(ctx, arabicPrayerNames[currentArcVakit.name] || currentArcVakit.name, 56, white, -191);
+
+        if (showAnalogue)
+            sac.drawAnalogueClock(ctx);
 
 
 
@@ -377,6 +414,100 @@ export default function Clock() {
             }
             return sac;
         },
+        // Analogue clock — fills the inner circle using PNG hands
+        drawAnalogueClock: (ctx) => {
+            const now  = new Date();
+            const hrs  = now.getHours() % 12;
+            const mins = now.getMinutes();
+            const secs = now.getSeconds();
+
+            const cx    = size / 2;
+            const cy    = size / 2;
+            const faceR = 370;
+
+            // ── Tick marks ────────────────────────────────────────────────────
+            ctx.save();
+            ctx.translate(cx, cy);
+            for (let t = 0; t < 60; t++) {
+                const ang    = (t / 60) * Math.PI * 2 - Math.PI / 2;
+                const isHour = t % 5 === 0;
+                const inner  = faceR * (isHour ? 0.88 : 0.93);
+                const outer  = faceR * 0.98;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(ang) * inner, Math.sin(ang) * inner);
+                ctx.lineTo(Math.cos(ang) * outer, Math.sin(ang) * outer);
+                ctx.strokeStyle = isHour ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)';
+                ctx.lineWidth   = isHour ? 3 : 1.5;
+                ctx.lineCap     = 'round';
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // ── PNG hand helper ───────────────────────────────────────────────
+            // img        — HTMLImageElement
+            // angle      — rotation in radians (0 = 12 o'clock)
+            // imgW/imgH  — natural pixel size of the PNG (857×168)
+            // pivotX/Y   — pivot point within the PNG (165, 85)
+            // targetTip  — desired canvas distance from centre to tip of hand
+            const drawPngHand = (img, angle, imgW, imgH, pivotX, pivotY, targetTip) => {
+                if (!img || !img.complete || img.naturalWidth === 0) return;
+                // The PNG points rightward; 12 o'clock needs -π/2 offset
+                const tipLen = imgW - pivotX;          // pixels from pivot to tip in PNG
+                const scale  = targetTip / tipLen;     // uniform scale to fit canvas
+                const dw     = imgW * scale;
+                const dh     = imgH * scale;
+                const dx     = -pivotX * scale;        // shift so pivot lands at (0,0)
+                const dy     = -pivotY * scale;
+
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(angle - Math.PI / 2);       // -π/2 maps rightward PNG → 12 o'clock
+                ctx.drawImage(img, dx, dy, dw, dh);
+                ctx.restore();
+            };
+
+            // ── Hour hand ─────────────────────────────────────────────────────
+            const hourAng = ((hrs + mins / 60) / 12) * Math.PI * 2;
+            drawPngHand(hourImgRef.current, hourAng, 857, 168, 165, 85, faceR * 0.56);
+
+            // ── Minute hand ───────────────────────────────────────────────────
+            const minAng = ((mins + secs / 60) / 60) * Math.PI * 2;
+            drawPngHand(minuteImgRef.current, minAng, 857, 168, 165, 85, faceR * 0.80);
+
+            // ── Second hand (red line) ────────────────────────────────────────
+            const secAng = (secs / 60) * Math.PI * 2 - Math.PI / 2;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(secAng);
+            ctx.beginPath();
+            ctx.moveTo(-faceR * 0.18, 0);
+            ctx.lineTo(faceR * 0.95, 0);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth   = 3;
+            ctx.lineCap     = 'round';
+            ctx.shadowColor = 'rgba(239,68,68,0.8)';
+            ctx.shadowBlur  = 8;
+            ctx.stroke();
+            ctx.restore();
+
+            // ── Centre pivot ──────────────────────────────────────────────────
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.beginPath();
+            ctx.arc(0, 0, 11, 0, Math.PI * 2);
+            ctx.fillStyle   = 'rgba(255,255,255,0.9)';
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur  = 8;
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.fillStyle  = '#ef4444';
+            ctx.shadowBlur = 0;
+            ctx.fill();
+            ctx.restore();
+
+            return sac;
+        },
     }
 
     const updateBackground = (bg) => {
@@ -507,15 +638,8 @@ export default function Clock() {
     // Side-panel font: size each cell so 31 items fill the full available height
     const sideCellHeight = `calc((100vh - ${TOP_BAR + BOTTOM_BAR}px) / 31)`
     const sideFontSize   = `calc((100vh - ${TOP_BAR + BOTTOM_BAR}px) / 31 * 0.58)`
-    // Arabic prayer names (proper Arabic script)
-    const arabicNames = {
-        Fajr:    'الفجر',
-        Sunrise: 'الضحى',
-        Dhuhr:   'الظهر',
-        Asr:     'العصر',
-        Maghrib: 'المغرب',
-        Isha:    'العشاء',
-    }
+    // Arabic prayer names (proper Arabic script) — reuses arabicPrayerNames defined above
+    const arabicNames = arabicPrayerNames
 
     // ── Top panel: prayer times (RTL — Fajr on right, Isha on left) ──────────
     const TopPanel = () => {
@@ -581,8 +705,15 @@ export default function Clock() {
     }
 
     // ── Bottom panel: days of week — English (left half) + Arabic (right half) ─
-    // localNow.getDay() → 0=Sun,1=Mon,...,6=Sat
-    const currentDayOfWeek = localNow.getDay()
+    // After Maghrib the Islamic day has already advanced, so the day-of-week
+    // shown in the Arabic panel and the Islamic date overlay must also advance.
+    const isAfterMaghrib = currentVakit &&
+        (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
+    // Islamic day-of-week: if after Maghrib, use tomorrow's Gregorian weekday
+    const islamicDayOfWeek = isAfterMaghrib
+        ? (localNow.getDay() + 1) % 7
+        : localNow.getDay()
+    const currentDayOfWeek = islamicDayOfWeek
 
     // English days: Mon–Sun (index 0=Mon … 6=Sun, mapped to JS getDay 1–0)
     const enDays = [
@@ -904,6 +1035,63 @@ export default function Clock() {
             <BottomPanel />
             <LeftPanel />
             <RightPanel />
+
+            {/* ── Gregorian date overlay — bottom-left, between side bars and clock circle ── */}
+            {(() => {
+                const enDayNames   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+                const enMonthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                const dayName   = enDayNames[localNow.getDay()]
+                const monthName = enMonthNames[currentGregorianMonth]
+                const isWeekend = localNow.getDay() === 0 || localNow.getDay() === 6
+                const accentColor = isWeekend ? '#4ade80' : '#fbbf24'
+                const textShadow  = '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)'
+                return (
+                    <div style={{
+                        position: 'fixed',
+                        bottom: BOTTOM_BAR + 12,
+                        left: SIDE_TOTAL_L + 16,
+                        zIndex: 98,
+                        display: 'flex',
+                        flexDirection: 'row',
+                        alignItems: 'baseline',
+                        gap: 10,
+                        direction: 'ltr',
+                        pointerEvents: 'none',
+                        fontFamily: calibri,
+                        textShadow,
+                        whiteSpace: 'nowrap',
+                    }}>
+                        {/* Day name — amber weekday, green weekend */}
+                        <span style={{
+                            fontSize: 'clamp(28px, 4.2vw, 68px)',
+                            fontWeight: 'bold',
+                            lineHeight: 1.15,
+                            color: accentColor,
+                        }}>{dayName}</span>
+                        {/* Month name — white */}
+                        <span style={{
+                            fontSize: 'clamp(28px, 4.2vw, 68px)',
+                            fontWeight: 'bold',
+                            lineHeight: 1.15,
+                            color: 'rgba(255,255,255,0.92)',
+                        }}>{monthName}</span>
+                        {/* Day number — amber weekday, green weekend */}
+                        <span style={{
+                            fontSize: 'clamp(28px, 4.2vw, 68px)',
+                            fontWeight: 'bold',
+                            lineHeight: 1.15,
+                            color: accentColor,
+                        }}>{currentGregorianDay},</span>
+                        {/* Year — smaller, white */}
+                        <span style={{
+                            fontSize: 'clamp(22px, 3.4vw, 56px)',
+                            fontWeight: 'normal',
+                            lineHeight: 1.15,
+                            color: 'rgba(255,255,255,0.85)',
+                        }}>{currentGregorianYear}</span>
+                    </div>
+                )
+            })()}
 
             {/* ── Islamic date overlay — top-right, between side bars and clock circle ── */}
             {(() => {
