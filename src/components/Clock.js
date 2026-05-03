@@ -4,6 +4,25 @@ import { format12 } from '../scripts/SmartAzanClock'
 import { HijriMonths } from '../data/Common'
 import tempColourConfig from '../data/temperatureColours.json'
 
+// ── Hadith of the day ─────────────────────────────────────────────────────────
+// Parsed once at module load from /hadiths.csv (TSV format)
+let _hadiths = null
+const loadHadiths = async () => {
+    if (_hadiths) return _hadiths
+    try {
+        const res  = await fetch('/hadiths.csv')
+        const text = await res.text()
+        const rows = text.trim().split('\n').slice(1) // skip header
+        _hadiths = rows.map(row => {
+            const cols = row.split('\t')
+            return { arabic: cols[0] || '', english: cols[1] || '', reference: cols[2] || '' }
+        }).filter(h => h.arabic)
+    } catch (e) {
+        _hadiths = []
+    }
+    return _hadiths
+}
+
 export default function Clock() {
 
     const { showMenu, setShowMenu, nextText, todaysDate, hijriDate, locationSettings,
@@ -27,6 +46,30 @@ export default function Clock() {
     useEffect(() => {
         const id = setInterval(() => setTick(t => t + 1), 1000)
         return () => clearInterval(id)
+    }, [])
+
+    // ── Hadith of the hour — pick randomly, refresh every hour ──────────────
+    const [dailyHadith, setDailyHadith] = useState(null)
+    useEffect(() => {
+        const pickRandom = (hadiths) => {
+            if (!hadiths.length) return
+            setDailyHadith(hadiths[Math.floor(Math.random() * hadiths.length)])
+        }
+        loadHadiths().then(pickRandom)
+
+        // Align the next swap to the top of the next clock hour
+        const scheduleNext = () => {
+            const now        = new Date()
+            const msToNextHr = (60 - now.getMinutes()) * 60000 - now.getSeconds() * 1000 - now.getMilliseconds()
+            return setTimeout(() => {
+                loadHadiths().then(pickRandom)
+                // After the first aligned tick, repeat every hour exactly
+                const id = setInterval(() => loadHadiths().then(pickRandom), 3600000)
+                return () => clearInterval(id)
+            }, msToNextHr)
+        }
+        const timeoutId = scheduleNext()
+        return () => clearTimeout(timeoutId)
     }, [])
 
     const handlePointerDown = (e) => {
@@ -916,7 +959,7 @@ export default function Clock() {
             <div style={{
                 position: 'fixed', top: 0, right: 0,
                 width: SIDE_TOTAL_R, height: TOP_BAR,
-                background: 'black', color: 'white',
+                background: 'black',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 zIndex: 101, overflow: 'hidden',
             }}>
@@ -926,8 +969,95 @@ export default function Clock() {
                     fontWeight: 'bold',
                     whiteSpace: 'nowrap',
                     direction: 'rtl',
+                    color: '#4ade80',
                 }}>نور الصلاة</span>
             </div>
+
+            {/* Noor us Sa'at — narrow portrait panel, top-right of clock area */}
+            {dailyHadith && (
+                <div style={{
+                    position: 'fixed',
+                    top: TOP_BAR + 10,
+                    right: SIDE_TOTAL_R + 10,
+                    // Narrow portrait card — wide enough for wrapped Arabic text, won't reach the dial
+                    width: 'clamp(280px, 28vw, 400px)',
+                    // Tall enough for content but capped so it doesn't dominate
+                    maxHeight: `calc(100vh * 0.84)`,
+                    background: 'rgba(0,0,0,0.72)',
+                    borderRadius: 10,
+                    border: '1px solid rgba(74,222,128,0.25)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'stretch',
+                    zIndex: 97,
+                    padding: '16px 20px',
+                    gap: 12,
+                    overflow: 'hidden',
+                    fontFamily: calibri,
+                    textShadow: '0 1px 4px rgba(0,0,0,0.95)',
+                    pointerEvents: 'none',
+                }}>
+                    {/* Title: نُورُ السَّاعَةِ */}
+                    <span style={{
+                        color: '#4ade80',
+                        fontSize: 'clamp(22px, 2.2vw, 30px)',
+                        fontWeight: 'bold',
+                        direction: 'rtl',
+                        textAlign: 'center',
+                        whiteSpace: 'nowrap',
+                        borderBottom: '1px solid rgba(74,222,128,0.3)',
+                        paddingBottom: 10,
+                        flexShrink: 0,
+                    }}>نُورُ السَّاعَةِ</span>
+
+                    {/* Arabic hadith text */}
+                    <span style={{
+                        color: 'white',
+                        fontSize: 'clamp(20px, 2.0vw, 26px)',
+                        lineHeight: 1.75,
+                        textAlign: 'right',
+                        direction: 'rtl',
+                        wordBreak: 'break-word',
+                        overflow: 'hidden',
+                        flexShrink: 1,
+                    }}>{dailyHadith.arabic}</span>
+
+                    {/* Divider */}
+                    <div style={{
+                        width: '100%', height: 1,
+                        background: 'rgba(255,255,255,0.15)',
+                        flexShrink: 0,
+                    }} />
+
+                    {/* English translation */}
+                    <span style={{
+                        color: 'white',
+                        fontSize: 'clamp(18px, 1.8vw, 24px)',
+                        lineHeight: 1.5,
+                        textAlign: 'left',
+                        direction: 'ltr',
+                        wordBreak: 'break-word',
+                        overflow: 'hidden',
+                        fontStyle: 'italic',
+                        flexShrink: 1,
+                    }}>{dailyHadith.english}</span>
+
+                    {/* Reference */}
+                    <span style={{
+                        color: '#fbbf24',
+                        fontSize: 'clamp(18px, 1.7vw, 22px)',
+                        lineHeight: 1.3,
+                        textAlign: 'left',
+                        direction: 'ltr',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 'bold',
+                        flexShrink: 0,
+                        marginTop: 2,
+                    }}>{dailyHadith.reference}</span>
+                </div>
+            )}
 
             {/* Bottom-left corner: current Gregorian year, straight */}
             <div style={{
@@ -1038,7 +1168,7 @@ export default function Clock() {
 
             {/* ── Gregorian date overlay — bottom-left, between side bars and clock circle ── */}
             {(() => {
-                const enDayNames   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+                const enDayNames   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
                 const enMonthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
                 const dayName   = enDayNames[localNow.getDay()]
                 const monthName = enMonthNames[currentGregorianMonth]
@@ -1061,28 +1191,28 @@ export default function Clock() {
                         textShadow,
                         whiteSpace: 'nowrap',
                     }}>
-                        {/* Day name — amber weekday, green weekend */}
+                        {/* Day name — same size as year, amber weekday, green weekend */}
                         <span style={{
-                            fontSize: 'clamp(28px, 4.2vw, 68px)',
-                            fontWeight: 'bold',
+                            fontSize: 'clamp(22px, 3.4vw, 56px)',
+                            fontWeight: 'normal',
                             lineHeight: 1.15,
                             color: accentColor,
                         }}>{dayName}</span>
-                        {/* Month name — white */}
+                        {/* Month name — white, large */}
                         <span style={{
                             fontSize: 'clamp(28px, 4.2vw, 68px)',
                             fontWeight: 'bold',
                             lineHeight: 1.15,
                             color: 'rgba(255,255,255,0.92)',
                         }}>{monthName}</span>
-                        {/* Day number — amber weekday, green weekend */}
+                        {/* Day number — amber weekday, green weekend, large */}
                         <span style={{
                             fontSize: 'clamp(28px, 4.2vw, 68px)',
                             fontWeight: 'bold',
                             lineHeight: 1.15,
                             color: accentColor,
                         }}>{currentGregorianDay},</span>
-                        {/* Year — smaller, white */}
+                        {/* Year — same size as day name, white */}
                         <span style={{
                             fontSize: 'clamp(22px, 3.4vw, 56px)',
                             fontWeight: 'normal',
