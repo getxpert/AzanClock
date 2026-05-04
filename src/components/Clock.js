@@ -3,6 +3,7 @@ import { AppContext } from '../AppContext';
 import { format12 } from '../scripts/SmartAzanClock'
 import { HijriMonths } from '../data/Common'
 import tempColourConfig from '../data/temperatureColours.json'
+import { EventsService } from '../services/EventsService'
 
 // ── Hadith of the day ─────────────────────────────────────────────────────────
 // Parsed once at module load from /hadiths.csv (TSV format)
@@ -15,7 +16,7 @@ const loadHadiths = async () => {
         const rows = text.trim().split('\n').slice(1) // skip header
         _hadiths = rows.map(row => {
             const cols = row.split('\t')
-            return { arabic: cols[0] || '', english: cols[1] || '', reference: cols[2] || '' }
+            return { type: cols[0] || '', arabic: cols[1] || '', english: cols[2] || '', reference: cols[3] || '' }
         }).filter(h => h.arabic)
     } catch (e) {
         _hadiths = []
@@ -50,10 +51,12 @@ export default function Clock() {
 
     // ── Hadith of the hour — pick randomly, refresh every hour ──────────────
     const [dailyHadith, setDailyHadith] = useState(null)
+    const [hadithExpanded, setHadithExpanded] = useState(true)
     useEffect(() => {
         const pickRandom = (hadiths) => {
             if (!hadiths.length) return
             setDailyHadith(hadiths[Math.floor(Math.random() * hadiths.length)])
+            setHadithExpanded(true)
         }
         loadHadiths().then(pickRandom)
 
@@ -70,6 +73,15 @@ export default function Clock() {
         }
         const timeoutId = scheduleNext()
         return () => clearTimeout(timeoutId)
+    }, [])
+
+    // ── Events panel — refresh every minute ─────────────────────────────────
+    const [eventsData, setEventsData] = useState({ active: [], upcoming: [] })
+    useEffect(() => {
+        const refresh = () => EventsService.getActiveAndUpcoming(new Date(), 5).then(setEventsData)
+        refresh()
+        const id = setInterval(refresh, 60000)
+        return () => clearInterval(id)
     }, [])
 
     const handlePointerDown = (e) => {
@@ -199,16 +211,74 @@ export default function Clock() {
 
         if (showAnalogue) {
             // ── Analogue-only text layout ─────────────────────────────────────
-            // Arabic salah name — top of dial, big, amber
+            // Compute 12h hand positions (clock-hours 0–12) to find empty space
+            const _now  = new Date()
+            const _hrs  = _now.getHours() % 12
+            const _mins = _now.getMinutes()
+            const _secs = _now.getSeconds()
+            const _hourPos = (_hrs + _mins / 60)           // 0–12
+            const _minPos  = (_mins + _secs / 60) / 5      // 0–12 (minutes mapped to hour positions)
+
+            // Returns true if either hand is within ±1 hour of the given clock position
+            const handNear = (pos) => {
+                const wrap = (v) => ((v % 12) + 12) % 12
+                const diff = (a, b) => Math.min(Math.abs(wrap(a) - wrap(b)), 12 - Math.abs(wrap(a) - wrap(b)))
+                return diff(_hourPos, pos) < 1 || diff(_minPos, pos) < 1
+            }
+
+            // Pick block anchor: prefer 3, then 9, then 12
+            // 3 o'clock = pos 3, 9 o'clock = pos 9, 12 o'clock = pos 0/12
+            let _bx, _by
+            if (!handNear(3)) {
+                _bx = 320; _by = 0        // 3 o'clock
+            } else if (!handNear(9)) {
+                _bx = -320; _by = 0       // 9 o'clock
+            } else {
+                _bx = 0; _by = -300       // 12 o'clock
+            }
+
+            // Draw the three-line block centred at (_bx, _by)
+            // Line 1: current prayer name — amber, 52px,  offset -68 from centre
+            // Line 2: current time        — white, 104px, offset   0 from centre
+            // Line 3: next · in · time    — silver/amber, 44px, offset +75 from centre
             if (currentArcVakit.name !== 'Duhaend')
-                sac.printXY(ctx, arabicPrayerNames[currentArcVakit.name] || currentArcVakit.name, 80, '#FFC800', 0, -380)
+                sac.printXY(ctx, currentArcVakit.name, 52, '#FFC800', _bx, _by - 68)
 
-            // Current time — far right near edge, clear of hands, large
-            sac.printXY(ctx, bigTime, 104, white, 320, 0)
+            sac.printXY(ctx, bigTime, 104, white, _bx, _by)
 
-            // Remaining time — near 6 o'clock, Arabic prayer name + larger countdown
-            sac.printXY(ctx, arabicPrayerNames[nextVakit.name] || nextVakit.name, 56, white, 0, 265)
-            sac.printXY(ctx, nextText, 104, white, 0, 355)
+            // Next prayer + countdown — tight inline: name · 'in' (amber) · time
+            ;(() => {
+                const fs = 44, fsIn = 38, gap = 10
+                const cx = size / 2, cy = size / 2
+                const nameStr = nextVakit.name || ''
+                ctx.save()
+                ctx.translate(cx, cy)
+                ctx.textBaseline = 'middle'
+                ctx.textAlign = 'left'
+                ctx.font = `bold ${fs}px Arial`
+                const wName = ctx.measureText(nameStr).width
+                ctx.font = `bold ${fsIn}px Arial`
+                const wIn = ctx.measureText('in').width
+                ctx.font = `bold ${fs}px Arial`
+                const wTime = ctx.measureText(nextText).width
+                const totalW = wName + gap + wIn + gap + wTime
+                let xCursor = _bx - totalW / 2
+                // prayer name
+                ctx.font = `bold ${fs}px Arial`
+                ctx.fillStyle = silver
+                ctx.fillText(nameStr, xCursor, _by + 75)
+                xCursor += wName + gap
+                // 'in'
+                ctx.font = `bold ${fsIn}px Arial`
+                ctx.fillStyle = '#FFC800'
+                ctx.fillText('in', xCursor, _by + 75)
+                xCursor += wIn + gap
+                // countdown
+                ctx.font = `bold ${fs}px Arial`
+                ctx.fillStyle = silver
+                ctx.fillText(nextText, xCursor, _by + 75)
+                ctx.restore()
+            })()
         } else {
             // ── Digital / Both — original layout ─────────────────────────────
             sac.print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
@@ -805,7 +875,7 @@ export default function Clock() {
                 fontFamily: calibri,
             }}>
                 {enDays.map(({ label, jsDay, weekend }) => {
-                    const isToday = jsDay === currentDayOfWeek
+                    const isToday = jsDay === localNow.getDay()
                     const bg = isToday
                         ? (weekend
                             ? 'rgba(34, 197, 94, 0.85)'    // green  — weekend
@@ -986,42 +1056,57 @@ export default function Clock() {
 
             {/* Noor us Sa'at — narrow portrait panel, top-right of clock area */}
             {dailyHadith && (
-                <div style={{
-                    position: 'fixed',
-                    top: TOP_BAR + 10,
-                    right: SIDE_TOTAL_R + 10,
-                    // Narrow portrait card — wide enough for wrapped Arabic text, won't reach the dial
-                    width: 'clamp(280px, 28vw, 400px)',
-                    // Tall enough for content but capped so it doesn't dominate
-                    maxHeight: `calc(100vh * 0.84)`,
-                    background: 'rgba(0,0,0,0.72)',
-                    borderRadius: 10,
-                    border: '1px solid rgba(74,222,128,0.25)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'stretch',
-                    zIndex: 97,
-                    padding: '16px 20px',
-                    gap: 12,
-                    overflow: 'hidden',
-                    fontFamily: calibri,
-                    textShadow: '0 1px 4px rgba(0,0,0,0.95)',
-                    pointerEvents: 'none',
-                }}>
-                    {/* Title: نُورُ السَّاعَةِ */}
-                    <span style={{
-                        color: '#4ade80',
-                        fontSize: 'clamp(22px, 2.2vw, 30px)',
-                        fontWeight: 'bold',
-                        direction: 'rtl',
-                        textAlign: 'center',
-                        whiteSpace: 'nowrap',
+                <div
+                    onClick={() => setHadithExpanded(e => !e)}
+                    style={{
+                        position: 'fixed',
+                        top: TOP_BAR + 10,
+                        right: SIDE_TOTAL_R + 10,
+                        // Narrow portrait card — wide enough for wrapped Arabic text, won't reach the dial
+                        width: 'clamp(280px, 28vw, 400px)',
+                        background: 'rgba(0,0,0,0.72)',
+                        borderRadius: 10,
+                        border: '1px solid rgba(74,222,128,0.25)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'stretch',
+                        zIndex: 97,
+                        padding: '16px 20px',
+                        gap: 12,
+                        overflow: 'visible',
+                        fontFamily: calibri,
+                        textShadow: '0 1px 4px rgba(0,0,0,0.95)',
+                        pointerEvents: 'auto',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                    }}>
+                    {/* Title: نُورُ السَّاعَةِ — with expand/collapse chevron */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
                         borderBottom: '1px solid rgba(74,222,128,0.3)',
                         paddingBottom: 10,
                         flexShrink: 0,
-                    }}>نُورُ السَّاعَةِ</span>
+                    }}>
+                        <span style={{
+                            color: 'rgba(74,222,128,0.6)',
+                            fontSize: 'clamp(14px, 1.4vw, 18px)',
+                            lineHeight: 1,
+                            transition: 'transform 0.25s ease',
+                            transform: hadithExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        }}>▼</span>
+                        <span style={{
+                            color: '#4ade80',
+                            fontSize: 'clamp(22px, 2.2vw, 30px)',
+                            fontWeight: 'bold',
+                            direction: 'rtl',
+                            textAlign: 'center',
+                            whiteSpace: 'nowrap',
+                        }}>نُورُ السَّاعَةِ</span>
+                    </div>
 
-                    {/* Arabic hadith text */}
+                    {/* Arabic hadith text — always visible */}
                     <span style={{
                         color: 'white',
                         fontSize: 'clamp(20px, 2.0vw, 26px)',
@@ -1029,44 +1114,49 @@ export default function Clock() {
                         textAlign: 'right',
                         direction: 'rtl',
                         wordBreak: 'break-word',
-                        overflow: 'hidden',
-                        flexShrink: 1,
                     }}>{dailyHadith.arabic}</span>
 
-                    {/* Divider */}
-                    <div style={{
-                        width: '100%', height: 1,
-                        background: 'rgba(255,255,255,0.15)',
-                        flexShrink: 0,
-                    }} />
+                    {/* English translation + reference — only shown when expanded */}
+                    {hadithExpanded && (<>
+                        {/* Divider */}
+                        <div style={{
+                            width: '100%', height: 1,
+                            background: 'rgba(255,255,255,0.15)',
+                        }} />
 
-                    {/* English translation */}
-                    <span style={{
-                        color: 'white',
-                        fontSize: 'clamp(18px, 1.8vw, 24px)',
-                        lineHeight: 1.5,
-                        textAlign: 'left',
-                        direction: 'ltr',
-                        wordBreak: 'break-word',
-                        overflow: 'hidden',
-                        fontStyle: 'italic',
-                        flexShrink: 1,
-                    }}>{dailyHadith.english}</span>
+                        {/* English translation */}
+                        <span style={{
+                            color: 'white',
+                            fontSize: 'clamp(18px, 1.8vw, 24px)',
+                            lineHeight: 1.5,
+                            textAlign: 'left',
+                            direction: 'ltr',
+                            wordBreak: 'break-word',
+                            fontStyle: 'italic',
+                        }}>{dailyHadith.english}</span>
 
-                    {/* Reference */}
-                    <span style={{
-                        color: '#fbbf24',
-                        fontSize: 'clamp(18px, 1.7vw, 22px)',
-                        lineHeight: 1.3,
-                        textAlign: 'left',
-                        direction: 'ltr',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontWeight: 'bold',
-                        flexShrink: 0,
-                        marginTop: 2,
-                    }}>{dailyHadith.reference}</span>
+                        {/* Reference + Type */}
+                        <span style={{
+                            color: '#fbbf24',
+                            fontSize: 'clamp(18px, 1.7vw, 22px)',
+                            lineHeight: 1.3,
+                            textAlign: 'left',
+                            direction: 'ltr',
+                            fontWeight: 'bold',
+                            marginTop: 2,
+                        }}>{dailyHadith.type && `${dailyHadith.type} · `}{dailyHadith.reference}</span>
+                    </>)}
+
+                    {/* Collapsed hint — shown only when not expanded */}
+                    {!hadithExpanded && (
+                        <span style={{
+                            color: 'rgba(251,191,36,0.7)',
+                            fontSize: 'clamp(13px, 1.3vw, 16px)',
+                            textAlign: 'center',
+                            fontStyle: 'italic',
+                            flexShrink: 0,
+                        }}>tap to read translation</span>
+                    )}
                 </div>
             )}
 
@@ -1176,6 +1266,152 @@ export default function Clock() {
             <BottomPanel />
             <LeftPanel />
             <RightPanel />
+
+            {/* ── Events panel — lower-left, above the date overlay ── */}
+            {(() => {
+                const { active, upcoming } = eventsData
+                if (active.length === 0 && upcoming.length === 0) return null
+
+                return (
+                    <div style={{
+                        position: 'fixed',
+                        bottom: BOTTOM_BAR + 100,   // sit above the date overlay
+                        left: SIDE_TOTAL_L + 16,
+                        zIndex: 98,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: 8,
+                        pointerEvents: 'none',
+                        fontFamily: calibri,
+                        maxWidth: 'clamp(300px, 34vw, 500px)',
+                    }}>
+                        {/* Active events — larger box + fonts */}
+                        {active.map((ev, i) => (
+                            <div key={`active-${i}`} style={{
+                                background: `${ev.colour_code || '#ffffff'}28`,
+                                border: `2px solid ${ev.colour_code || '#ffffff'}88`,
+                                borderLeft: `6px solid ${ev.colour_code || '#4ade80'}`,
+                                borderRadius: 10,
+                                padding: '12px 18px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 5,
+                                backdropFilter: 'blur(4px)',
+                                width: '100%',
+                            }}>
+                                {/* Title row */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <span style={{
+                                        background: 'rgba(74,222,128,0.85)',
+                                        color: '#000',
+                                        fontSize: 'clamp(10px, 1.1vw, 14px)',
+                                        fontWeight: 'bold',
+                                        padding: '2px 8px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                    }}>NOW</span>
+                                    <span style={{
+                                        color: '#fff',
+                                        fontSize: 'clamp(16px, 2vw, 24px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                    }}>{ev.title}</span>
+                                </div>
+                                {/* Description */}
+                                {ev.description && (
+                                    <span style={{
+                                        color: 'rgba(255,255,255,0.82)',
+                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
+                                        lineHeight: 1.3,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                    }}>{ev.description}</span>
+                                )}
+                                {/* Assigned to + time remaining */}
+                                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {ev.assigned_to && (
+                                        <span style={{
+                                            color: '#fbbf24',
+                                            fontSize: 'clamp(12px, 1.3vw, 16px)',
+                                            fontWeight: 'bold',
+                                            whiteSpace: 'nowrap',
+                                        }}>👤 {ev.assigned_to}</span>
+                                    )}
+                                    <span style={{
+                                        color: ev.minutesRemaining <= 10
+                                            ? '#ef4444'
+                                            : ev.minutesRemaining <= 30
+                                                ? '#fbbf24'
+                                                : '#4ade80',
+                                        fontSize: 'clamp(12px, 1.3vw, 16px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                    }}>⏱ {EventsService.formatMinutes(ev.minutesRemaining)} left</span>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Upcoming events — smaller, no shadow */}
+                        {upcoming.map((ev, i) => (
+                            <div key={`upcoming-${i}`} style={{
+                                background: 'rgba(0,0,0,0.55)',
+                                border: `1px solid ${ev.colour_code || '#ffffff'}44`,
+                                borderLeft: `4px solid ${ev.colour_code || '#fbbf24'}`,
+                                borderRadius: 8,
+                                padding: '6px 12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 2,
+                                backdropFilter: 'blur(4px)',
+                                width: '100%',
+                                opacity: 0.88,
+                            }}>
+                                {/* Title row */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{
+                                        background: 'rgba(251,191,36,0.85)',
+                                        color: '#000',
+                                        fontSize: 'clamp(9px, 1vw, 12px)',
+                                        fontWeight: 'bold',
+                                        padding: '1px 6px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                    }}>NEXT</span>
+                                    <span style={{
+                                        color: 'rgba(255,255,255,0.9)',
+                                        fontSize: 'clamp(12px, 1.4vw, 17px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                    }}>{ev.title}</span>
+                                </div>
+                                {/* Countdown + assigned to */}
+                                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {ev.assigned_to && (
+                                        <span style={{
+                                            color: '#fbbf24',
+                                            fontSize: 'clamp(10px, 1.1vw, 13px)',
+                                            whiteSpace: 'nowrap',
+                                        }}>👤 {ev.assigned_to}</span>
+                                    )}
+                                    <span style={{
+                                        color: 'rgba(255,255,255,0.75)',
+                                        fontSize: 'clamp(10px, 1.1vw, 13px)',
+                                        whiteSpace: 'nowrap',
+                                    }}>⏳ in {EventsService.formatMinutes(ev.minutesRemaining)}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )
+            })()}
 
             {/* ── Gregorian date overlay — bottom-left, between side bars and clock circle ── */}
             {(() => {
