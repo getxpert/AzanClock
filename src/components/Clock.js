@@ -78,7 +78,7 @@ export default function Clock() {
     // ── Events panel — refresh every minute ─────────────────────────────────
     const [eventsData, setEventsData] = useState({ active: [], upcoming: [] })
     useEffect(() => {
-        const refresh = () => EventsService.getActiveAndUpcoming(new Date(), 5).then(setEventsData)
+        const refresh = () => EventsService.getActiveAndUpcoming(new Date(), 3).then(setEventsData)
         refresh()
         const id = setInterval(refresh, 60000)
         return () => clearInterval(id)
@@ -1284,71 +1284,77 @@ export default function Clock() {
                         gap: 8,
                         pointerEvents: 'none',
                         fontFamily: calibri,
-                        maxWidth: 'clamp(300px, 34vw, 500px)',
+                        maxWidth: 'clamp(405px, 46vw, 675px)',
                     }}>
                         {/* Active events — larger box + fonts */}
                         {active.map((ev, i) => (
                             <div key={`active-${i}`} style={{
                                 background: `${ev.colour_code || '#ffffff'}28`,
                                 border: `2px solid ${ev.colour_code || '#ffffff'}88`,
-                                borderLeft: `6px solid ${ev.colour_code || '#4ade80'}`,
-                                borderRadius: 10,
-                                padding: '12px 18px',
+                                borderLeft: `8px solid ${ev.colour_code || '#4ade80'}`,
+                                borderRadius: 13,
+                                padding: '16px 24px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: 5,
+                                gap: 7,
                                 backdropFilter: 'blur(4px)',
                                 width: '100%',
                             }}>
-                                {/* Title row */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    <span style={{
-                                        background: 'rgba(74,222,128,0.85)',
-                                        color: '#000',
-                                        fontSize: 'clamp(10px, 1.1vw, 14px)',
-                                        fontWeight: 'bold',
-                                        padding: '2px 8px',
-                                        borderRadius: 4,
-                                        whiteSpace: 'nowrap',
-                                        flexShrink: 0,
-                                    }}>NOW</span>
-                                    <span style={{
-                                        color: '#fff',
-                                        fontSize: 'clamp(16px, 2vw, 24px)',
-                                        fontWeight: 'bold',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                    }}>{ev.title}</span>
+                                {/* Title row — NOW badge · title · assigned (right) */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 13, justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 13, overflow: 'hidden' }}>
+                                        <span style={{
+                                            background: 'rgba(74,222,128,0.85)',
+                                            color: '#000',
+                                            fontSize: 'clamp(12px, 1.45vw, 19px)',
+                                            fontWeight: 'bold',
+                                            padding: '3px 11px',
+                                            borderRadius: 5,
+                                            whiteSpace: 'nowrap',
+                                            flexShrink: 0,
+                                        }}>NOW</span>
+                                        <span style={{
+                                            color: '#fff',
+                                            fontSize: 'clamp(22px, 2.7vw, 32px)',
+                                            fontWeight: 'bold',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.75), 2px 2px 0 rgba(0,0,0,0.8)',
+                                        }}>{ev.title}</span>
+                                    </div>
+                                    {ev.assigned_to && (
+                                        <span style={{
+                                            color: '#fbbf24',
+                                            fontSize: 'clamp(14px, 1.55vw, 20px)',
+                                            fontWeight: 'bold',
+                                            whiteSpace: 'nowrap',
+                                            flexShrink: 0,
+                                            textAlign: 'right',
+                                        }}>👤 {ev.assigned_to}</span>
+                                    )}
                                 </div>
                                 {/* Description */}
                                 {ev.description && (
                                     <span style={{
                                         color: 'rgba(255,255,255,0.82)',
-                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
+                                        fontSize: 'clamp(17px, 2vw, 24px)',
                                         lineHeight: 1.3,
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
+                                        textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.75)',
                                     }}>{ev.description}</span>
                                 )}
-                                {/* Assigned to + time remaining */}
-                                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                                    {ev.assigned_to && (
-                                        <span style={{
-                                            color: '#fbbf24',
-                                            fontSize: 'clamp(12px, 1.3vw, 16px)',
-                                            fontWeight: 'bold',
-                                            whiteSpace: 'nowrap',
-                                        }}>👤 {ev.assigned_to}</span>
-                                    )}
+                                {/* Time remaining */}
+                                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
                                     <span style={{
                                         color: ev.minutesRemaining <= 10
                                             ? '#ef4444'
                                             : ev.minutesRemaining <= 30
                                                 ? '#fbbf24'
                                                 : '#4ade80',
-                                        fontSize: 'clamp(12px, 1.3vw, 16px)',
+                                        fontSize: 'clamp(16px, 1.75vw, 22px)',
                                         fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
                                     }}>⏱ {EventsService.formatMinutes(ev.minutesRemaining)} left</span>
@@ -1356,59 +1362,100 @@ export default function Clock() {
                             </div>
                         ))}
 
-                        {/* Upcoming events — smaller, no shadow */}
-                        {upcoming.map((ev, i) => (
+                        {/* Upcoming events */}
+                        {upcoming.map((ev, i) => {
+                            const occDate = ev.nextOccurrence
+                            const occHH   = String(occDate.getHours()).padStart(2, '0')
+                            const occMM   = String(occDate.getMinutes()).padStart(2, '0')
+                            const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+                            const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+                            const occWhen = `${occHH}:${occMM} ${DAY_NAMES[occDate.getDay()]}, ${MONTH_NAMES[occDate.getMonth()]} ${occDate.getDate()}`
+                            // Append days+hours if more than 24h away
+                            const diffMins = Math.ceil((occDate - new Date()) / 60000)
+                            const occLabel = diffMins > 24 * 60
+                                ? (() => {
+                                    const days  = Math.floor(diffMins / (24 * 60))
+                                    const hours = Math.floor((diffMins % (24 * 60)) / 60)
+                                    return `${occWhen} · ${hours > 0 ? `${days}d ${hours}h` : `${days}d`}`
+                                })()
+                                : occWhen
+                            // Badge label: Today / Tomorrow / In X days
+                            // Compare calendar dates (midnight-to-midnight) not raw ms diff
+                            const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0)
+                            const occMidnight   = new Date(occDate); occMidnight.setHours(0,0,0,0)
+                            const calDays = Math.round((occMidnight - todayMidnight) / 86400000)
+                            const whenBadge = calDays === 0 ? 'Today'
+                                : calDays === 1 ? 'Tomorrow'
+                                : `In ${calDays} days`
+                            // Badge colour: green=Today, amber=Tomorrow, blue-ish=further
+                            const badgeBg = calDays === 0 ? 'rgba(74,222,128,0.85)'
+                                : calDays === 1 ? 'rgba(251,191,36,0.85)'
+                                : 'rgba(96,165,250,0.85)'
+                            return (
                             <div key={`upcoming-${i}`} style={{
                                 background: 'rgba(0,0,0,0.55)',
                                 border: `1px solid ${ev.colour_code || '#ffffff'}44`,
-                                borderLeft: `4px solid ${ev.colour_code || '#fbbf24'}`,
-                                borderRadius: 8,
-                                padding: '6px 12px',
+                                borderLeft: `5px solid ${ev.colour_code || '#fbbf24'}`,
+                                borderRadius: 11,
+                                padding: '8px 16px',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: 2,
+                                gap: 3,
                                 backdropFilter: 'blur(4px)',
                                 width: '100%',
                                 opacity: 0.88,
                             }}>
-                                {/* Title row */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{
-                                        background: 'rgba(251,191,36,0.85)',
-                                        color: '#000',
-                                        fontSize: 'clamp(9px, 1vw, 12px)',
-                                        fontWeight: 'bold',
-                                        padding: '1px 6px',
-                                        borderRadius: 4,
-                                        whiteSpace: 'nowrap',
-                                        flexShrink: 0,
-                                    }}>NEXT</span>
-                                    <span style={{
-                                        color: 'rgba(255,255,255,0.9)',
-                                        fontSize: 'clamp(12px, 1.4vw, 17px)',
-                                        fontWeight: 'bold',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                    }}>{ev.title}</span>
-                                </div>
-                                {/* Countdown + assigned to */}
-                                <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                                {/* Title row — badge · title · assigned (right) */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 9, justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, overflow: 'hidden' }}>
+                                        <span style={{
+                                            background: badgeBg,
+                                            color: '#000',
+                                            fontSize: 'clamp(12px, 1.35vw, 16px)',
+                                            fontWeight: 'bold',
+                                            padding: '2px 8px',
+                                            borderRadius: 4,
+                                            whiteSpace: 'nowrap',
+                                            flexShrink: 0,
+                                        }}>{whenBadge}</span>
+                                        <span style={{
+                                            color: 'rgba(255,255,255,0.9)',
+                                            fontSize: 'clamp(16px, 1.9vw, 23px)',
+                                            fontWeight: 'bold',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                        }}>{ev.title}</span>
+                                    </div>
                                     {ev.assigned_to && (
                                         <span style={{
                                             color: '#fbbf24',
-                                            fontSize: 'clamp(10px, 1.1vw, 13px)',
+                                            fontSize: 'clamp(12px, 1.35vw, 16px)',
+                                            fontWeight: 'bold',
                                             whiteSpace: 'nowrap',
+                                            flexShrink: 0,
+                                            textAlign: 'right',
                                         }}>👤 {ev.assigned_to}</span>
                                     )}
+                                </div>
+                                {/* Second line — scheduled time · remaining */}
+                                <div style={{ display: 'flex', gap: 11, alignItems: 'center', flexWrap: 'wrap' }}>
                                     <span style={{
-                                        color: 'rgba(255,255,255,0.75)',
-                                        fontSize: 'clamp(10px, 1.1vw, 13px)',
+                                        color: 'white',
+                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
+                                        fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
-                                    }}>⏳ in {EventsService.formatMinutes(ev.minutesRemaining)}</span>
+                                    }}>📅 {occLabel}</span>
+                                    <span style={{
+                                        color: '#fbbf24',
+                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                    }}>⏳ {EventsService.formatMinutes(ev.minutesRemaining)}</span>
                                 </div>
                             </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 )
             })()}
@@ -1606,7 +1653,7 @@ export default function Clock() {
                                 gap: 2,
                             }}>
                                 <span style={{
-                                    fontFamily: "'Orbitron', 'Courier New', monospace",
+                                    fontFamily: calibri,
                                     fontSize: 'clamp(18px, 2.6vw, 42px)',
                                     fontWeight: 'bold',
                                     color: 'white',
@@ -1620,7 +1667,7 @@ export default function Clock() {
                                 }}>{locationAddress}</span>
                                 {locationCountry && (
                                     <span style={{
-                                        fontFamily: "'Orbitron', 'Courier New', monospace",
+                                        fontFamily: calibri,
                                         fontSize: 'clamp(18px, 2.6vw, 42px)',
                                         fontWeight: 'bold',
                                         color: 'white',
