@@ -4,6 +4,7 @@ import { format12 } from '../scripts/SmartAzanClock'
 import { HijriMonths } from '../data/Common'
 import tempColourConfig from '../data/temperatureColours.json'
 import { EventsService } from '../services/EventsService'
+import { Audios } from '../data/Audios'
 
 // ── Hadith of the day ─────────────────────────────────────────────────────────
 // Parsed once at module load from /hadiths.csv (TSV format)
@@ -28,7 +29,7 @@ export default function Clock() {
 
     const { showMenu, setShowMenu, nextText, todaysDate, hijriDate, locationSettings,
         calculationSettings, deviceSettings, hourAngle, vakits, arcVakits, displayTime, currentVakit, nextVakit, currentArcVakit,
-        elapsed, background, dim, clockOpacity, midnightAngle, oneThirdAngle, twoThirdAngle, alarmSettings, naflAlarmSettings, isWeekDay, weatherData, time } = useContext(AppContext)
+        elapsed, background, dim, clockOpacity, midnightAngle, oneThirdAngle, twoThirdAngle, alarmSettings, naflAlarmSettings, isWeekDay, weatherData, time, isAudioPlaying } = useContext(AppContext)
     const canvasRef = useRef(null)
     const driftRef = useRef(null)
     const dragWrapperRef = useRef(null)
@@ -75,14 +76,47 @@ export default function Clock() {
         return () => clearTimeout(timeoutId)
     }, [])
 
-    // ── Events panel — refresh every minute ─────────────────────────────────
+    // ── Events: refresh active/upcoming + check notifications every minute at second=0 ──
     const [eventsData, setEventsData] = useState({ active: [], upcoming: [] })
+    const notifiedRef   = useRef(new Set())
+    const notifAudioRef = useRef(null)
     useEffect(() => {
-        const refresh = () => EventsService.getActiveAndUpcoming(new Date(), 3).then(setEventsData)
-        refresh()
-        const id = setInterval(refresh, 60000)
+        const notifSrc = Audios.find(a => a.id === 101)?.source
+
+        const tick = async () => {
+            if (new Date().getSeconds() !== 0) return
+
+            // ── Refresh active/upcoming panel ────────────────────────────────
+            const data = await EventsService.getActiveAndUpcoming(new Date(), 3)
+            setEventsData(data)
+
+            // ── Notification check ───────────────────────────────────────────
+            if (!isAudioPlaying && notifSrc) {
+                const due = await EventsService.getNotificationsDue(new Date())
+                for (const ev of due) {
+                    const key = `${ev.id}-${ev.nextOccurrence.toISOString()}`
+                    if (notifiedRef.current.has(key)) continue
+
+                    notifiedRef.current.add(key)
+
+                    if (notifAudioRef.current) {
+                        notifAudioRef.current.pause()
+                        notifAudioRef.current.currentTime = 0
+                    }
+                    const audio = new Audio(notifSrc)
+                    notifAudioRef.current = audio
+                    audio.play().catch(() => {})
+                    break  // one notification at a time
+                }
+            }
+        }
+
+        // Run once immediately on mount (seconds may not be 0, but gets initial data)
+        EventsService.getActiveAndUpcoming(new Date(), 3).then(setEventsData)
+
+        const id = setInterval(tick, 1000)
         return () => clearInterval(id)
-    }, [])
+    }, [isAudioPlaying])
 
     const handlePointerDown = (e) => {
         const drag = dragRef.current
@@ -1284,7 +1318,7 @@ export default function Clock() {
                         gap: 8,
                         pointerEvents: 'none',
                         fontFamily: calibri,
-                        maxWidth: 'clamp(405px, 46vw, 675px)',
+                        maxWidth: 'clamp(400px, 45vw, 650px)',
                     }}>
                         {/* Active events — larger box + fonts */}
                         {active.map((ev, i) => (
@@ -1300,39 +1334,27 @@ export default function Clock() {
                                 backdropFilter: 'blur(4px)',
                                 width: '100%',
                             }}>
-                                {/* Title row — NOW badge · title · assigned (right) */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 13, justifyContent: 'space-between' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 13, overflow: 'hidden' }}>
-                                        <span style={{
-                                            background: 'rgba(74,222,128,0.85)',
-                                            color: '#000',
-                                            fontSize: 'clamp(12px, 1.45vw, 19px)',
-                                            fontWeight: 'bold',
-                                            padding: '3px 11px',
-                                            borderRadius: 5,
-                                            whiteSpace: 'nowrap',
-                                            flexShrink: 0,
-                                        }}>NOW</span>
-                                        <span style={{
-                                            color: '#fff',
-                                            fontSize: 'clamp(22px, 2.7vw, 32px)',
-                                            fontWeight: 'bold',
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.75), 2px 2px 0 rgba(0,0,0,0.8)',
-                                        }}>{ev.title}</span>
-                                    </div>
-                                    {ev.assigned_to && (
-                                        <span style={{
-                                            color: '#fbbf24',
-                                            fontSize: 'clamp(14px, 1.55vw, 20px)',
-                                            fontWeight: 'bold',
-                                            whiteSpace: 'nowrap',
-                                            flexShrink: 0,
-                                            textAlign: 'right',
-                                        }}>👤 {ev.assigned_to}</span>
-                                    )}
+                                {/* Title row — NOW badge · title */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                                    <span style={{
+                                        background: 'rgba(74,222,128,0.85)',
+                                        color: '#000',
+                                        fontSize: 'clamp(12px, 1.45vw, 19px)',
+                                        fontWeight: 'bold',
+                                        padding: '3px 11px',
+                                        borderRadius: 5,
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0,
+                                    }}>NOW</span>
+                                    <span style={{
+                                        color: '#fff',
+                                        fontSize: 'clamp(22px, 2.7vw, 32px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.75), 2px 2px 0 rgba(0,0,0,0.8)',
+                                    }}>{ev.title}</span>
                                 </div>
                                 {/* Description */}
                                 {ev.description && (
@@ -1346,8 +1368,8 @@ export default function Clock() {
                                         textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.75)',
                                     }}>{ev.description}</span>
                                 )}
-                                {/* Time remaining */}
-                                <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                                {/* Time remaining · assigned to (right) */}
+                                <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
                                     <span style={{
                                         color: ev.minutesRemaining <= 10
                                             ? '#ef4444'
@@ -1358,6 +1380,15 @@ export default function Clock() {
                                         fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
                                     }}>⏱ {EventsService.formatMinutes(ev.minutesRemaining)} left</span>
+                                    {ev.assigned_to && (
+                                        <span style={{
+                                            color: '#fbbf24',
+                                            fontSize: 'clamp(14px, 1.55vw, 20px)',
+                                            fontWeight: 'bold',
+                                            whiteSpace: 'nowrap',
+                                            textAlign: 'right',
+                                        }}>👤 {ev.assigned_to}</span>
+                                    )}
                                 </div>
                             </div>
                         ))}

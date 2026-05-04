@@ -261,4 +261,31 @@ const formatMinutes = (mins) => {
     return `${m}m`
 }
 
-export const EventsService = { loadEvents, getActiveAndUpcoming, clearCache, formatMinutes }
+/**
+ * Returns all upcoming (not yet active) events whose notification window is
+ * currently open — i.e. the event starts within the next `NotifyMinutes` minutes.
+ *
+ * @param {Date} now — reference time (defaults to new Date())
+ */
+const getNotificationsDue = async (now = new Date()) => {
+    const events = await loadEvents()
+    const due = []
+
+    for (const event of events) {
+        const occ = findNextOccurrence(event, now)
+        if (!occ) continue
+
+        // Only upcoming events (not already active)
+        if (occ.start <= now) continue
+
+        const minsUntilStart = (occ.start - now) / 60000
+        const notifyMins = parseInt(event.NotifyMinutes, 10) || 0
+        if (notifyMins > 0 && minsUntilStart <= notifyMins) {
+            due.push({ ...event, nextOccurrence: occ.start, occurrenceEnd: occ.end })
+        }
+    }
+
+    return due
+}
+
+export const EventsService = { loadEvents, getActiveAndUpcoming, getNotificationsDue, clearCache, formatMinutes }
