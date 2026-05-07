@@ -727,14 +727,56 @@ export default function Clock() {
     // Current hour (0-23)
     const currentHour = localNow.getHours()
 
+    // ── Display profile — drives all layout constants ────────────────────────
+    const profile = deviceSettings.displayProfile || 'landscape'
+    const isPortrait  = profile === 'portable-portrait'
+    const isPortableLandscape = profile === 'portable-landscape'
+
+    // Per-profile layout values
+    const PROFILE = {
+        'desktop': {
+            TOP_BAR: 56, BOTTOM_BAR: 32,
+            SIDE_INNER: 32, SIDE_OUTER_L: 64, SIDE_OUTER_R: 120,
+            showSidePanels: true, showBottomPanel: true, showCornerYears: true,
+            eventsMaxW: 'clamp(385px, 43.7vw, 641px)',
+            hadithW: 'clamp(280px, 28vw, 400px)',
+            weatherIconSize: 'clamp(72px, 11vw, 140px)',
+            weatherTempSize: 'clamp(42px, 6.5vw, 88px)',
+            weatherLocSize: 'clamp(18px, 2.6vw, 42px)',
+            dateOverlayBottom: null,   // null = use BOTTOM_BAR + 12 (fixed bottom)
+        },
+        'landscape': {
+            TOP_BAR: 44, BOTTOM_BAR: 24,
+            SIDE_INNER: 24, SIDE_OUTER_L: 48, SIDE_OUTER_R: 88,
+            showSidePanels: true, showBottomPanel: true, showCornerYears: true,
+            eventsMaxW: 'clamp(280px, 36vw, 480px)',
+            hadithW: 'clamp(200px, 22vw, 320px)',
+            weatherIconSize: 'clamp(48px, 8vw, 96px)',
+            weatherTempSize: 'clamp(28px, 4.5vw, 60px)',
+            weatherLocSize: 'clamp(13px, 1.8vw, 28px)',
+            dateOverlayBottom: null,
+        },
+        'portrait': {
+            TOP_BAR: 40, BOTTOM_BAR: 0,
+            SIDE_INNER: 0, SIDE_OUTER_L: 0, SIDE_OUTER_R: 0,
+            showSidePanels: false, showBottomPanel: false, showCornerYears: false,
+            eventsMaxW: 'min(96vw, 480px)',
+            hadithW: null,   // hidden in portrait
+            weatherIconSize: 'clamp(36px, 7vw, 64px)',
+            weatherTempSize: 'clamp(22px, 4vw, 44px)',
+            weatherLocSize: 'clamp(12px, 2vw, 22px)',
+            dateOverlayBottom: null,
+        },
+    }[profile] || {}
+
     // Shared panel style constants
-    const TOP_BAR       = 56                        // prayer bar — taller, at the top
-    const BOTTOM_BAR    = 32                        // 24-hour bar — at the bottom
-    const SIDE_INNER    = BOTTOM_BAR                // day-number panels width (32px)
-    const SIDE_OUTER_L  = BOTTOM_BAR * 2            // left outer bar: months list (64px)
-    const SIDE_OUTER_R  = 120                       // right outer bar: wider for Arabic month names
-    const SIDE_TOTAL_L  = SIDE_INNER + SIDE_OUTER_L // total left margin (96px)
-    const SIDE_TOTAL_R  = SIDE_INNER + SIDE_OUTER_R // total right margin (152px)
+    const TOP_BAR       = PROFILE.TOP_BAR
+    const BOTTOM_BAR    = PROFILE.BOTTOM_BAR
+    const SIDE_INNER    = PROFILE.SIDE_INNER
+    const SIDE_OUTER_L  = PROFILE.SIDE_OUTER_L
+    const SIDE_OUTER_R  = PROFILE.SIDE_OUTER_R
+    const SIDE_TOTAL_L  = SIDE_INNER + SIDE_OUTER_L // total left margin
+    const SIDE_TOTAL_R  = SIDE_INNER + SIDE_OUTER_R // total right margin
     const calibri       = "'Calibri', 'Calibri Light', 'Candara', 'Segoe UI', sans-serif"
     const panelBg       = 'rgba(0,0,0,0.55)'
     const hlColor       = '#000'
@@ -1089,7 +1131,7 @@ export default function Clock() {
             </div>
 
             {/* Noor us Sa'at — narrow portrait panel, top-right of clock area */}
-            {dailyHadith && (
+            {dailyHadith && PROFILE.hadithW && (
                 <div
                     onClick={() => setHadithExpanded(e => !e)}
                     style={{
@@ -1097,7 +1139,7 @@ export default function Clock() {
                         top: TOP_BAR + 10,
                         right: SIDE_TOTAL_R + 10,
                         // Narrow portrait card — wide enough for wrapped Arabic text, won't reach the dial
-                        width: 'clamp(280px, 28vw, 400px)',
+                        width: PROFILE.hadithW,
                         background: 'rgba(0,0,0,0.72)',
                         borderRadius: 10,
                         border: '1px solid rgba(74,222,128,0.25)',
@@ -1195,7 +1237,7 @@ export default function Clock() {
             )}
 
             {/* Bottom-left corner: current Gregorian year, straight */}
-            <div style={{
+            {PROFILE.showCornerYears && <div style={{
                 position: 'fixed', bottom: 0, left: 0,
                 width: SIDE_TOTAL_L, height: BOTTOM_BAR,
                 background: 'black', color: 'white',
@@ -1209,10 +1251,10 @@ export default function Clock() {
                     letterSpacing: 2,
                     whiteSpace: 'nowrap',
                 }}>{currentGregorianYear}</span>
-            </div>
+            </div>}
 
             {/* Bottom-right corner: current Hijri year, straight */}
-            <div style={{
+            {PROFILE.showCornerYears && <div style={{
                 position: 'fixed', bottom: 0, right: 0,
                 width: SIDE_TOTAL_R, height: BOTTOM_BAR,
                 background: 'black', color: 'white',
@@ -1226,10 +1268,10 @@ export default function Clock() {
                     letterSpacing: 2,
                     whiteSpace: 'nowrap',
                 }}>{currentHijriYear}</span>
-            </div>
+            </div>}
 
             {/* Outer left bar: months of the year Jan–Dec with day-progress highlight */}
-            <div style={{
+            {PROFILE.showSidePanels && <div style={{
                 position: 'fixed', top: TOP_BAR, left: 0, bottom: BOTTOM_BAR,
                 width: SIDE_OUTER_L,
                 background: 'rgba(0,0,0,0.7)',
@@ -1256,10 +1298,10 @@ export default function Clock() {
                         }}>{name}</div>
                     )
                 })}
-            </div>
+            </div>}
 
             {/* Outer right bar: Islamic months in Arabic, Muharram–Dhul Hijjah */}
-            <div style={{
+            {PROFILE.showSidePanels && <div style={{
                 position: 'fixed', top: TOP_BAR, right: 0, bottom: BOTTOM_BAR,
                 width: SIDE_OUTER_R,
                 background: 'rgba(0,0,0,0.7)',
@@ -1294,12 +1336,12 @@ export default function Clock() {
                         }}>{name}</div>
                     )
                 })}
-            </div>
+            </div>}
 
             <TopPanel />
-            <BottomPanel />
-            <LeftPanel />
-            <RightPanel />
+            {PROFILE.showBottomPanel && <BottomPanel />}
+            {PROFILE.showSidePanels && <LeftPanel />}
+            {PROFILE.showSidePanels && <RightPanel />}
 
             {/* ── Events panel — lower-left, above the date overlay ── */}
             {(() => {
@@ -1318,7 +1360,7 @@ export default function Clock() {
                         gap: 8,
                         pointerEvents: 'none',
                         fontFamily: calibri,
-                        maxWidth: 'clamp(400px, 45vw, 650px)',
+                        maxWidth: PROFILE.eventsMaxW,
                     }}>
                         {/* Active events — larger box + fonts */}
                         {active.map((ev, i) => (
@@ -1504,7 +1546,8 @@ export default function Clock() {
                     <div style={{
                         position: 'fixed',
                         bottom: BOTTOM_BAR + 12,
-                        left: SIDE_TOTAL_L + 16,
+                        left: isPortrait ? '50%' : SIDE_TOTAL_L + 16,
+                        transform: isPortrait ? 'translateX(-50%)' : undefined,
                         zIndex: 98,
                         display: 'flex',
                         flexDirection: 'row',
@@ -1548,8 +1591,8 @@ export default function Clock() {
                 )
             })()}
 
-            {/* ── Islamic date overlay — top-right, between side bars and clock circle ── */}
-            {(() => {
+            {/* ── Islamic date overlay — bottom-right (hidden in portrait) ── */}
+            {!isPortrait && (() => {
                 const arabicHijriMonths = [
                     'مُحَرَّم','صَفَر','رَبيع الأوَّل','رَبيع الثاني',
                     'جُمادى الأولى','جُمادى الآخِرة','رَجَب','شَعبان',
@@ -1642,22 +1685,22 @@ export default function Clock() {
                                     src={`/moon/${currentHijriDay}.png`}
                                     alt={`Moon day ${currentHijriDay}`}
                                     style={{
-                                        width: 'clamp(72px, 11vw, 140px)',
-                                        height: 'clamp(72px, 11vw, 140px)',
+                                        width: PROFILE.weatherIconSize,
+                                        height: PROFILE.weatherIconSize,
                                         objectFit: 'contain',
                                         filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 4px 12px rgba(0,0,0,0.85)) drop-shadow(0 0 20px rgba(0,0,0,0.7))',
                                     }}
                                 />
                             ) : (
                                 <span style={{
-                                    fontSize: 'clamp(72px, 11vw, 140px)',
+                                    fontSize: PROFILE.weatherIconSize,
                                     lineHeight: 1,
                                     filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.95)) drop-shadow(0 4px 12px rgba(0,0,0,0.85)) drop-shadow(0 0 20px rgba(0,0,0,0.7))',
                                 }}>{weatherIcon}</span>
                             )}
                             <span style={{
                                 fontFamily: "'Orbitron', 'Courier New', monospace",
-                                fontSize: 'clamp(42px, 6.5vw, 88px)',
+                                fontSize: PROFILE.weatherTempSize,
                                 fontWeight: 'bold',
                                 textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
                                 letterSpacing: '0.04em',
@@ -1685,7 +1728,7 @@ export default function Clock() {
                             }}>
                                 <span style={{
                                     fontFamily: calibri,
-                                    fontSize: 'clamp(18px, 2.6vw, 42px)',
+                                    fontSize: PROFILE.weatherLocSize,
                                     fontWeight: 'bold',
                                     color: 'white',
                                     textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
@@ -1699,7 +1742,7 @@ export default function Clock() {
                                 {locationCountry && (
                                     <span style={{
                                         fontFamily: calibri,
-                                        fontSize: 'clamp(18px, 2.6vw, 42px)',
+                                        fontSize: PROFILE.weatherLocSize,
                                         fontWeight: 'bold',
                                         color: 'white',
                                         textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',

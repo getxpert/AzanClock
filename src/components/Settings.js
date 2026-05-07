@@ -97,6 +97,16 @@ export default function Settings() {
             </div>
 
             <div className="mt-2">
+                <span className='badge mb-1 p-0'>Display Profile</span>
+                <Options name="deviceSettings.displayProfile" selectedValue={deviceSettings.displayProfile || 'desktop'}
+                    values={[
+                        { id: 'desktop',            name: '🖥️ Desktop (Landscape)' },
+                        { id: 'portable-landscape', name: '📱 Portable Landscape'   },
+                        { id: 'portable-portrait',  name: '📱 Portable Portrait'    },
+                    ]} />
+            </div>
+
+            <div className="mt-2">
                 <span className='badge mb-1 p-0'>Display Mode</span>
                 <Options name="deviceSettings.mode" selectedValue={deviceSettings.mode} values={DeviceModes} />
             </div>

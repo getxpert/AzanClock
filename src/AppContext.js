@@ -18,7 +18,14 @@ export default function AppContextProvider() {
     const [showLoading, setShowLoading] = useState(false);
     const [isAudioPlaying, setIsAudioPlaying] = useState(false);
     const [isSilkBrowser, setIsSilkBrowser] = useState(false);
-    const [weatherData, setWeatherData] = useState(null);
+    const [weatherData, setWeatherData] = useState(() => {
+        // Restore last cached weather data immediately so the overlay shows on first render
+        try {
+            const stored = localStorage.getItem('lastWeatherData')
+            if (stored) return JSON.parse(stored)
+        } catch (e) { /* ignore */ }
+        return null
+    });
 
     const [output, setOutput] = useState(() => {
 
