@@ -8,12 +8,12 @@ id	assigned_by	assigned_to	time_start	time_end	NotifyMinutes	day_start	day_end	f
 7	Mom	Adan	12:30	13:30	5	01/01/2026	01/01/2030	Weekly	Tu	Class	#FFFFFF	Home	High	Auntie Sabeen's Class	Attend the Class on Zoom in iPad
 8	Mom	Adan	14:00	15:00	5	01/01/2026	01/01/2030	Weekly	Fr	Class	#FFFFFF	Home	High	Auntie Sabeen's Class	Attend the Class on Zoom in iPad
 9	Dad	Ashar	18:00	18:50	5	01/01/2026	01/01/2030	Weekly	Sa	Class	#FFFFFF	Home	High	Preply Arabic	Attend the Class on PC
-10	Mom	Sundus	20:00	21:00	5	01/01/2026	01/01/2030	Weekly	Th	Class	#FFFFFF	Home	High	Madina Arabic	Attend the Class on Mobile
-11	Mom	Sundus	21:00	22:00	5	01/01/2026	01/01/2030	Weekly	Th	Class	#FFFFFF	Home	High	Seerah	Attend the Class on Mobile
-12	Mom	Sundus	10:00	12:30	5	01/01/2026	01/01/2030	Weekly	Tu	Class	#FFFFFF	Home	High	Al Huda Class	Attend the Class on Mobile
-13	Mom	Sundus	17:45	18:30	5	01/01/2026	01/01/2030	Weekly	Wk	Class	#FFFFFF	Home	High	Seerah + Tajweed	Attend the Class on Mobile
+10	Mom	SunAsh	20:00	21:00	5	01/01/2026	01/01/2030	Weekly	Th	Class	#FFFFFF	Home	High	Madina Arabic	Attend the Class on Mobile
+11	Mom	SunAsh	21:00	22:00	5	01/01/2026	01/01/2030	Weekly	Th	Class	#FFFFFF	Home	High	Seerah	Attend the Class on Mobile
+12	Mom	SunAsh	10:00	12:30	5	01/01/2026	01/01/2030	Weekly	Tu	Class	#FFFFFF	Home	High	Al Huda Class	Attend the Class on Mobile
+13	Mom	SunAsh	17:45	18:30	5	01/01/2026	01/01/2030	Weekly	Wk	Class	#FFFFFF	Home	High	Seerah + Tajweed	Attend the Class on Mobile
 14	Dad	Ashar	0:00	23:59	5	20/06/2026	20/06/2050	Annual	Day	Birthday	#FFFFFF	Home	Med	Dad's Birthday	
-14	Dad	Sundus	0:00	23:59	5	09/11/2026	09/11/2050	Annual	Day	Birthday	#FFFFFF	Home	Med	Mom's Birthday	
+14	Dad	SunAsh	0:00	23:59	5	09/11/2026	09/11/2050	Annual	Day	Birthday	#FFFFFF	Home	Med	Mom's Birthday	
 14	Dad	Adan	0:00	23:59	5	10/01/2026	10/01/2050	Annual	Day	Birthday	#FFFFFF	Home	Med	Adan's Birthday	
 14	Dad	Ayma	0:00	23:59	5	24/07/2026	24/07/2050	Annual	Day	Birthday	#FFFFFF	Home	Med	Ayma's Birthday	
-19	Dad	Ashar	2:00	2:50	1	01/01/2026	01/01/2030	Daily	Day	Class	#1e0c6bff	Home	High	Preply Arabic	Attend the Class on PC
+19	Dad	Ashar	18:00	18:50	1	01/01/2026	01/01/2030	Weekly	Sa	Class	#1e0c6bff	Home	High	Preply Arabic	Attend the Class on PC

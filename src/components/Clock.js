@@ -43,6 +43,9 @@ export default function Clock() {
         const m = new Image(); m.src = '/minutehand.png'; minuteImgRef.current = m
     }, [])
 
+    // moonImgRef is populated after currentHijriDay is computed (see below)
+    const moonImgRef = useRef(null)
+
     // Tick every second so the canvas redraws and the second hand moves
     const [, setTick] = useState(0)
     useEffect(() => {
@@ -87,7 +90,7 @@ export default function Clock() {
             if (new Date().getSeconds() !== 0) return
 
             // ── Refresh active/upcoming panel ────────────────────────────────
-            const data = await EventsService.getActiveAndUpcoming(new Date(), 3)
+            const data = await EventsService.getActiveAndUpcoming(new Date(), 2)
             setEventsData(data)
 
             // ── Notification check ───────────────────────────────────────────
@@ -112,7 +115,7 @@ export default function Clock() {
         }
 
         // Run once immediately on mount (seconds may not be 0, but gets initial data)
-        EventsService.getActiveAndUpcoming(new Date(), 3).then(setEventsData)
+        EventsService.getActiveAndUpcoming(new Date(), 2).then(setEventsData)
 
         const id = setInterval(tick, 1000)
         return () => clearInterval(id)
@@ -171,6 +174,24 @@ export default function Clock() {
         Maghrib: 'المغرب',
         Isha:    'العشاء',
     }
+
+    // ── Temperature colour resolver — used both on canvas and in HTML overlay ─
+    // Resolve colour bands from the external JSON config (sorted descending by min)
+    // localStorage key 'temperatureColours' overrides the bundled default
+    const getTempColours = (temp) => {
+        let config = tempColourConfig;
+        try {
+            const stored = localStorage.getItem('temperatureColours');
+            if (stored) config = JSON.parse(stored);
+        } catch (e) { /* ignore */ }
+        const bands = (config.bands || []).slice().sort((a, b) => b.min - a.min);
+        for (const band of bands) {
+            if (temp >= band.min) {
+                return { unit: band.unit, number: band.number };
+            }
+        }
+        return (config.default) || { unit: 'white', number: 'white' };
+    };
 
     useEffect(() => {
         const el = driftRef.current
@@ -260,15 +281,38 @@ export default function Clock() {
                 return diff(_hourPos, pos) < 1 || diff(_minPos, pos) < 1
             }
 
-            // Pick block anchor: prefer 3, then 9, then 12
-            // 3 o'clock = pos 3, 9 o'clock = pos 9, 12 o'clock = pos 0/12
+            // ── Four candidate positions inside the dial ──────────────────────
+            // pos3  = 3 o'clock  (right),  pos9  = 9 o'clock  (left)
+            // pos12 = 12 o'clock (top),    pos6  = 6 o'clock  (bottom)
+            const pos3Free  = !handNear(3)
+            const pos9Free  = !handNear(9)
+            const pos12Free = !handNear(0)   // 0 == 12 on a 12h clock
+            const pos6Free  = !handNear(6)
+
+            // ── Time block: prefer 3 → 9 → 12 ────────────────────────────────
             let _bx, _by
-            if (!handNear(3)) {
-                _bx = 320; _by = 0        // 3 o'clock
-            } else if (!handNear(9)) {
-                _bx = -320; _by = 0       // 9 o'clock
+            if (pos3Free) {
+                _bx = 260; _by = 0        // 3 o'clock
+            } else if (pos9Free) {
+                _bx = -260; _by = 0       // 9 o'clock
             } else {
-                _bx = 0; _by = -300       // 12 o'clock
+                _bx = 0; _by = -244       // 12 o'clock
+            }
+
+            // ── Weather block: prefer 6 → 12 → 9 ─────────────────────────────
+            // (must not collide with the time block position)
+            const timeAt9  = _bx === -260 && _by === 0
+            const timeAt12 = _bx === 0    && _by === -244
+
+            let _wx, _wy
+            if (pos6Free) {
+                _wx = 0; _wy = 244        // 6 o'clock
+            } else if (pos12Free && !timeAt12) {
+                _wx = 0; _wy = -244       // 12 o'clock
+            } else if (!timeAt9) {
+                _wx = -260; _wy = 0       // 9 o'clock
+            } else {
+                _wx = 260; _wy = 0        // 3 o'clock (last resort)
             }
 
             // Draw the three-line block centred at (_bx, _by)
@@ -313,6 +357,113 @@ export default function Clock() {
                 ctx.fillText(nextText, xCursor, _by + 75)
                 ctx.restore()
             })()
+
+            // ── Weather / moon block drawn inside the dial ────────────────────
+            // Only in landscape profile; sized to match the time block (104px icon, 52px temp)
+            if (profile === 'landscape' || profile === 'desktop' || profile === 'portable-landscape') {
+                const _afterSunset = currentVakit &&
+                    (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
+
+                const _weatherIcon = weatherData ? (() => {
+                    const code = weatherData.weatherCode
+                    if (code === 0)                          return '☀️'
+                    if (code === 1)                          return '🌤️'
+                    if (code === 2)                          return '⛅'
+                    if (code === 3)                          return '☁️'
+                    if (code === 45 || code === 48)          return '🌫️'
+                    if (code >= 51 && code <= 57)            return '🌦️'
+                    if (code >= 61 && code <= 67)            return '🌧️'
+                    if (code >= 71 && code <= 77)            return '❄️'
+                    if (code >= 80 && code <= 82)            return '🌧️'
+                    if (code >= 85 && code <= 86)            return '🌨️'
+                    if (code >= 95 && code <= 99)            return '⛈️'
+                    return '🌡️'
+                })() : null
+
+                if (weatherData && (_weatherIcon || _afterSunset)) {
+                    const cx = size / 2, cy = size / 2
+                    const iconSize = 104   // matches time font size
+                    const tempSize = 52    // matches prayer name font size
+
+                    // Icon line: centred at (_wx, _wy - tempSize*0.6)
+                    // Temp line: centred at (_wx, _wy + iconSize*0.5)
+                    const iconY = _wy - tempSize * 0.55
+                    const tempY = _wy + iconSize * 0.52
+
+                    if (_afterSunset) {
+                        // Moon phase PNG — draw on canvas
+                        const moonImg = moonImgRef.current
+                        if (moonImg && moonImg.complete && moonImg.naturalWidth > 0) {
+                            const imgSize = iconSize * 1.1
+                            ctx.save()
+                            ctx.translate(cx + _wx - imgSize / 2, cy + iconY - imgSize / 2)
+                            ctx.drawImage(moonImg, 0, 0, imgSize, imgSize)
+                            ctx.restore()
+                        }
+                    } else {
+                        // Weather emoji
+                        ctx.save()
+                        ctx.translate(cx, cy)
+                        ctx.font = `${iconSize}px Arial`
+                        ctx.textBaseline = 'middle'
+                        ctx.textAlign = 'center'
+                        ctx.fillText(_weatherIcon, _wx, iconY)
+                        ctx.restore()
+                    }
+
+                    // Temperature text
+                    if (weatherData.temperature !== undefined && weatherData.temperature !== null) {
+                        const tempColours = getTempColours(weatherData.temperature)
+                        ctx.save()
+                        ctx.translate(cx, cy)
+                        ctx.textBaseline = 'middle'
+                        ctx.textAlign = 'center'
+                        ctx.font = `bold ${tempSize}px Arial`
+                        // Measure parts for two-colour rendering
+                        const numStr  = String(weatherData.temperature)
+                        const unitStr = '°C'
+                        const numW    = ctx.measureText(numStr).width
+                        const unitW   = ctx.measureText(unitStr).width
+                        const totalTW = numW + unitW
+                        // Number
+                        ctx.fillStyle = tempColours.number
+                        ctx.textAlign = 'left'
+                        ctx.fillText(numStr, _wx - totalTW / 2, tempY)
+                        // Unit
+                        ctx.fillStyle = tempColours.unit
+                        ctx.fillText(unitStr, _wx - totalTW / 2 + numW, tempY)
+                        ctx.restore()
+                    }
+
+                    // Location text — address on one line, country on the next
+                    const toTitleCase = (str) => str
+                        ? str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                        : null
+                    const locAddress = toTitleCase(locationSettings?.address) || null
+                    const locCountry = toTitleCase(weatherData.country) || null
+                    if (locAddress || locCountry) {
+                        const locSize = 26   // smaller than temp, readable inside dial
+                        const locLineH = locSize * 1.35
+                        // Start just below the temperature line
+                        let locY = _wy + iconSize * 0.52 + tempSize * 0.7
+                        ctx.save()
+                        ctx.translate(cx, cy)
+                        ctx.textBaseline = 'middle'
+                        ctx.textAlign = 'center'
+                        ctx.font = `bold ${locSize}px Arial`
+                        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+                        if (locAddress) {
+                            ctx.fillText(locAddress, _wx, locY)
+                            locY += locLineH
+                        }
+                        if (locCountry) {
+                            ctx.fillStyle = 'rgba(200,200,200,0.75)'
+                            ctx.fillText(locCountry, _wx, locY)
+                        }
+                        ctx.restore()
+                    }
+                }
+            }
         } else {
             // ── Digital / Both — original layout ─────────────────────────────
             sac.print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
@@ -727,8 +878,16 @@ export default function Clock() {
     // Current hour (0-23)
     const currentHour = localNow.getHours()
 
+    // Pre-load moon phase PNG for canvas drawing — refreshes when Hijri day changes
+    // (placed here so currentHijriDay is already defined)
+    useEffect(() => {
+        const img = new Image()
+        img.src = `/moon/${currentHijriDay}.png`
+        moonImgRef.current = img
+    }, [currentHijriDay])
+
     // ── Display profile — drives all layout constants ────────────────────────
-    const profile = deviceSettings.displayProfile || 'landscape'
+    const profile = deviceSettings.displayProfile || 'portable-landscape'
     const isPortrait  = profile === 'portable-portrait'
     const isPortableLandscape = profile === 'portable-landscape'
 
@@ -738,14 +897,38 @@ export default function Clock() {
             TOP_BAR: 56, BOTTOM_BAR: 32,
             SIDE_INNER: 32, SIDE_OUTER_L: 64, SIDE_OUTER_R: 120,
             showSidePanels: true, showBottomPanel: true, showCornerYears: true,
-            eventsMaxW: 'clamp(385px, 43.7vw, 641px)',
-            hadithW: 'clamp(280px, 28vw, 400px)',
+            eventsMaxW: 'clamp(462px, 52.4vw, 769px)',
+            hadithW: 'clamp(224px, 22.4vw, 320px)',
             weatherIconSize: 'clamp(72px, 11vw, 140px)',
             weatherTempSize: 'clamp(42px, 6.5vw, 88px)',
             weatherLocSize: 'clamp(18px, 2.6vw, 42px)',
             dateOverlayBottom: null,   // null = use BOTTOM_BAR + 12 (fixed bottom)
         },
-        'landscape': {
+
+        'portable-landscape': {
+            TOP_BAR: 44, BOTTOM_BAR: 24,
+            SIDE_INNER: 24, SIDE_OUTER_L: 48, SIDE_OUTER_R: 88,
+            showSidePanels: false, showBottomPanel: false, showCornerYears: false,
+            eventsMaxW: 'clamp(336px, 43.2vw, 456px)',
+            hadithW: 'clamp(160px, 17.6vw, 256px)',
+            weatherIconSize: 'clamp(48px, 8vw, 96px)',
+            weatherTempSize: 'clamp(28px, 4.5vw, 60px)',
+            weatherLocSize: 'clamp(13px, 1.8vw, 28px)',
+            dateOverlayBottom: null,
+        },
+
+        'portable-portrait': {
+            TOP_BAR: 40, BOTTOM_BAR: 0,
+            SIDE_INNER: 0, SIDE_OUTER_L: 0, SIDE_OUTER_R: 0,
+            showSidePanels: false, showBottomPanel: false, showCornerYears: false,
+            eventsMaxW: 'min(96vw, 480px)',
+            hadithW: null,
+            weatherIconSize: 'clamp(36px, 7vw, 64px)',
+            weatherTempSize: 'clamp(22px, 4vw, 44px)',
+            weatherLocSize: 'clamp(12px, 2vw, 22px)',
+            dateOverlayBottom: null,
+        },
+             /*   'landscape': {
             TOP_BAR: 44, BOTTOM_BAR: 24,
             SIDE_INNER: 24, SIDE_OUTER_L: 48, SIDE_OUTER_R: 88,
             showSidePanels: true, showBottomPanel: true, showCornerYears: true,
@@ -756,7 +939,7 @@ export default function Clock() {
             weatherLocSize: 'clamp(13px, 1.8vw, 28px)',
             dateOverlayBottom: null,
         },
-        'portrait': {
+                'portrait': {
             TOP_BAR: 40, BOTTOM_BAR: 0,
             SIDE_INNER: 0, SIDE_OUTER_L: 0, SIDE_OUTER_R: 0,
             showSidePanels: false, showBottomPanel: false, showCornerYears: false,
@@ -766,7 +949,7 @@ export default function Clock() {
             weatherTempSize: 'clamp(22px, 4vw, 44px)',
             weatherLocSize: 'clamp(12px, 2vw, 22px)',
             dateOverlayBottom: null,
-        },
+        },*/
     }[profile] || {}
 
     // Shared panel style constants
@@ -845,11 +1028,13 @@ export default function Clock() {
     const TopPanel = () => {
         const rtlVakits = vakits ? [...vakits].reverse() : []
         // Responsive font: scales with viewport width, clamped between 11px and 28px
-        const prayerFont = `clamp(11px, ${TOP_BAR * 0.52}px, 2.2vw)`
+        const prayerFont = isPortableLandscape
+            ? `clamp(11px, ${TOP_BAR * 0.52}px, 3.2vw)`
+            : `clamp(11px, ${TOP_BAR * 0.52}px, 2.2vw)`
         const timeFont = "'Orbitron', 'Courier New', 'Lucida Console', monospace"
         return (
             <div style={{
-                position: 'fixed', top: 0, left: SIDE_TOTAL_L, right: SIDE_TOTAL_R, height: TOP_BAR,
+                position: 'fixed', top: 0, left: isPortableLandscape ? 0 : SIDE_TOTAL_L, right: isPortableLandscape ? 0 : SIDE_TOTAL_R, height: TOP_BAR,
                 background: panelBg, display: 'flex', alignItems: 'stretch',
                 overflow: 'hidden', zIndex: 100, fontFamily: calibri,
             }}>
@@ -1054,23 +1239,6 @@ export default function Clock() {
 
     // ── Weather icon + temperature overlay (top-left of clock area) ─────────
 
-    // Resolve colour bands from the external JSON config (sorted descending by min)
-    // localStorage key 'temperatureColours' overrides the bundled default
-    const getTempColours = (temp) => {
-        let config = tempColourConfig;
-        try {
-            const stored = localStorage.getItem('temperatureColours');
-            if (stored) config = JSON.parse(stored);
-        } catch (e) { /* ignore */ }
-        const bands = (config.bands || []).slice().sort((a, b) => b.min - a.min);
-        for (const band of bands) {
-            if (temp >= band.min) {
-                return { unit: band.unit, number: band.number };
-            }
-        }
-        return (config.default) || { unit: 'white', number: 'white' };
-    };
-
     // After sunset (Maghrib, Isha, Imsak) show moon phase PNG instead of weather emoji
     const afterSunset = currentVakit &&
         (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
@@ -1093,8 +1261,8 @@ export default function Clock() {
 
     return (
         <>
-            {/* Top-left corner: app icon */}
-            <div style={{
+            {/* Top-left corner: app icon — desktop only */}
+            {profile === 'desktop' && <div style={{
                 position: 'fixed', top: 0, left: 0,
                 width: SIDE_TOTAL_L, height: TOP_BAR,
                 background: 'black',
@@ -1110,10 +1278,10 @@ export default function Clock() {
                         objectFit: 'contain',
                     }}
                 />
-            </div>
+            </div>}
 
-            {/* Top-right corner: نور الصلاة */}
-            <div style={{
+            {/* Top-right corner: نور الصلاة — desktop only */}
+            {profile === 'desktop' && <div style={{
                 position: 'fixed', top: 0, right: 0,
                 width: SIDE_TOTAL_R, height: TOP_BAR,
                 background: 'black',
@@ -1128,7 +1296,7 @@ export default function Clock() {
                     direction: 'rtl',
                     color: '#4ade80',
                 }}>نور الصلاة</span>
-            </div>
+            </div>}
 
             {/* Noor us Sa'at — narrow portrait panel, top-right of clock area */}
             {dailyHadith && PROFILE.hadithW && (
@@ -1137,9 +1305,18 @@ export default function Clock() {
                     style={{
                         position: 'fixed',
                         top: TOP_BAR + 10,
-                        right: SIDE_TOTAL_R + 10,
+                        right: profile === 'portable-landscape' ? 10 : SIDE_TOTAL_R + 10,
                         // Narrow portrait card — wide enough for wrapped Arabic text, won't reach the dial
                         width: PROFILE.hadithW,
+                        // portable-landscape: stretch from just past the right dial edge to the right screen edge
+                        ...(profile === 'portable-landscape'
+                            ? {
+                                left: 'calc((100vw + 91vh) / 2 + 8px)',
+                                right: 10,
+                                width: 'auto',
+                              }
+                            : {}
+                        ),
                         background: 'rgba(0,0,0,0.72)',
                         borderRadius: 10,
                         border: '1px solid rgba(74,222,128,0.25)',
@@ -1156,32 +1333,6 @@ export default function Clock() {
                         cursor: 'pointer',
                         userSelect: 'none',
                     }}>
-                    {/* Title: نُورُ السَّاعَةِ — with expand/collapse chevron */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        borderBottom: '1px solid rgba(74,222,128,0.3)',
-                        paddingBottom: 10,
-                        flexShrink: 0,
-                    }}>
-                        <span style={{
-                            color: 'rgba(74,222,128,0.6)',
-                            fontSize: 'clamp(14px, 1.4vw, 18px)',
-                            lineHeight: 1,
-                            transition: 'transform 0.25s ease',
-                            transform: hadithExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                        }}>▼</span>
-                        <span style={{
-                            color: '#4ade80',
-                            fontSize: 'clamp(22px, 2.2vw, 30px)',
-                            fontWeight: 'bold',
-                            direction: 'rtl',
-                            textAlign: 'center',
-                            whiteSpace: 'nowrap',
-                        }}>نُورُ السَّاعَةِ</span>
-                    </div>
-
                     {/* Arabic hadith text — always visible */}
                     <span style={{
                         color: 'white',
@@ -1343,54 +1494,75 @@ export default function Clock() {
             {PROFILE.showSidePanels && <LeftPanel />}
             {PROFILE.showSidePanels && <RightPanel />}
 
-            {/* ── Events panel — lower-left, above the date overlay ── */}
+            {/* ── Events panel — top-left for portable-landscape; lower-left otherwise ── */}
             {(() => {
                 const { active, upcoming } = eventsData
                 if (active.length === 0 && upcoming.length === 0) return null
 
+                const isPortLand = profile === 'portable-landscape'
                 return (
                     <div style={{
                         position: 'fixed',
-                        bottom: BOTTOM_BAR + 100,   // sit above the date overlay
-                        left: SIDE_TOTAL_L + 16,
-                        zIndex: 98,
+                        // portable-landscape: full left gutter from screen edge to dial edge
+                        // all others: lower-left, above date overlay
+                        ...(isPortLand
+                            ? {
+                                top: TOP_BAR + 10,
+                                left: 4,
+                                bottom: BOTTOM_BAR + 10,
+                                maxWidth: 'calc((100vw - 91vh) / 2 - 12px)',
+                              }
+                            : { bottom: BOTTOM_BAR + 100, left: SIDE_TOTAL_L + 16 }
+                        ),
+                        zIndex: 96,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'flex-start',
                         gap: 8,
                         pointerEvents: 'none',
                         fontFamily: calibri,
-                        maxWidth: PROFILE.eventsMaxW,
+                        maxWidth: isPortLand
+                            ? 'calc((100vw - 91vh) / 2 - 12px)'
+                            : PROFILE.eventsMaxW,
+                        // portable-landscape: scroll vertically
+                        ...(isPortLand ? { overflowY: 'auto', overflowX: 'hidden' } : {}),
                     }}>
                         {/* Active events — larger box + fonts */}
                         {active.map((ev, i) => (
                             <div key={`active-${i}`} style={{
+                                position: 'relative',
                                 background: `${ev.colour_code || '#ffffff'}28`,
-                                border: `2px solid ${ev.colour_code || '#ffffff'}88`,
-                                borderLeft: `8px solid ${ev.colour_code || '#4ade80'}`,
-                                borderRadius: 13,
-                                padding: '16px 24px',
+                                border: `1px solid ${ev.colour_code || '#ffffff'}88`,
+                                borderLeft: `5px solid ${ev.colour_code || '#4ade80'}`,
+                                borderRadius: 11,
+                                padding: '14px 16px 8px 16px',
+                                marginTop: 10,
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: 7,
+                                gap: 3,
                                 backdropFilter: 'blur(4px)',
                                 width: '100%',
                             }}>
-                                {/* Title row — NOW badge · title */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                                {/* NOW badge — straight, top-left corner, half above the box */}
+                                <span style={{
+                                    position: 'absolute',
+                                    left: 10,
+                                    top: 0,
+                                    transform: 'translateY(-50%)',
+                                    background: 'rgba(74,222,128,0.85)',
+                                    color: '#000',
+                                    fontSize: 'clamp(10px, 1.1vw, 13px)',
+                                    fontWeight: 'bold',
+                                    padding: '2px 7px',
+                                    borderRadius: 4,
+                                    whiteSpace: 'nowrap',
+                                    pointerEvents: 'none',
+                                }}>NOW</span>
+                                {/* Title row */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                                     <span style={{
-                                        background: 'rgba(74,222,128,0.85)',
-                                        color: '#000',
-                                        fontSize: 'clamp(12px, 1.45vw, 19px)',
-                                        fontWeight: 'bold',
-                                        padding: '3px 11px',
-                                        borderRadius: 5,
-                                        whiteSpace: 'nowrap',
-                                        flexShrink: 0,
-                                    }}>NOW</span>
-                                    <span style={{
-                                        color: '#fff',
-                                        fontSize: 'clamp(22px, 2.7vw, 32px)',
+                                        color: 'rgba(255,255,255,0.9)',
+                                        fontSize: 'clamp(16px, 1.9vw, 23px)',
                                         fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
@@ -1398,36 +1570,36 @@ export default function Clock() {
                                         textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.75), 2px 2px 0 rgba(0,0,0,0.8)',
                                     }}>{ev.title}</span>
                                 </div>
-                                {/* Description */}
+                                {/* Second line — description */}
                                 {ev.description && (
-                                    <span style={{
-                                        color: 'rgba(255,255,255,0.82)',
-                                        fontSize: 'clamp(17px, 2vw, 24px)',
-                                        lineHeight: 1.3,
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.75)',
-                                    }}>{ev.description}</span>
+                                    <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
+                                        <span style={{
+                                            color: 'rgba(255,255,255,0.82)',
+                                            fontSize: 'clamp(13px, 1.5vw, 18px)',
+                                            fontWeight: 'bold',
+                                            whiteSpace: 'nowrap',
+                                        }}>{ev.description}</span>
+                                    </div>
                                 )}
-                                {/* Time remaining · assigned to (right) */}
-                                <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between' }}>
+                                {/* Third line — time remaining · assigned to */}
+                                <div style={{ display: 'flex', gap: 11, alignItems: 'center', justifyContent: 'space-between' }}>
                                     <span style={{
                                         color: ev.minutesRemaining <= 10
                                             ? '#ef4444'
                                             : ev.minutesRemaining <= 30
                                                 ? '#fbbf24'
                                                 : '#4ade80',
-                                        fontSize: 'clamp(16px, 1.75vw, 22px)',
+                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
                                         fontWeight: 'bold',
                                         whiteSpace: 'nowrap',
                                     }}>⏱ {EventsService.formatMinutes(ev.minutesRemaining)} left</span>
                                     {ev.assigned_to && (
                                         <span style={{
                                             color: '#fbbf24',
-                                            fontSize: 'clamp(14px, 1.55vw, 20px)',
+                                            fontSize: 'clamp(12px, 1.35vw, 16px)',
                                             fontWeight: 'bold',
                                             whiteSpace: 'nowrap',
+                                            flexShrink: 0,
                                             textAlign: 'right',
                                         }}>👤 {ev.assigned_to}</span>
                                     )}
@@ -1466,11 +1638,13 @@ export default function Clock() {
                                 : 'rgba(96,165,250,0.85)'
                             return (
                             <div key={`upcoming-${i}`} style={{
+                                position: 'relative',
                                 background: 'rgba(0,0,0,0.55)',
                                 border: `1px solid ${ev.colour_code || '#ffffff'}44`,
                                 borderLeft: `5px solid ${ev.colour_code || '#fbbf24'}`,
                                 borderRadius: 11,
-                                padding: '8px 16px',
+                                padding: '14px 16px 8px 16px',
+                                marginTop: 10,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: 3,
@@ -1478,28 +1652,49 @@ export default function Clock() {
                                 width: '100%',
                                 opacity: 0.88,
                             }}>
-                                {/* Title row — badge · title · assigned (right) */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 9, justifyContent: 'space-between' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 9, overflow: 'hidden' }}>
-                                        <span style={{
-                                            background: badgeBg,
-                                            color: '#000',
-                                            fontSize: 'clamp(12px, 1.35vw, 16px)',
-                                            fontWeight: 'bold',
-                                            padding: '2px 8px',
-                                            borderRadius: 4,
-                                            whiteSpace: 'nowrap',
-                                            flexShrink: 0,
-                                        }}>{whenBadge}</span>
-                                        <span style={{
-                                            color: 'rgba(255,255,255,0.9)',
-                                            fontSize: 'clamp(16px, 1.9vw, 23px)',
-                                            fontWeight: 'bold',
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                        }}>{ev.title}</span>
-                                    </div>
+                                {/* Badge — straight, top-left corner, half above the box */}
+                                <span style={{
+                                    position: 'absolute',
+                                    left: 10,
+                                    top: 0,
+                                    transform: 'translateY(-50%)',
+                                    background: badgeBg,
+                                    color: '#000',
+                                    fontSize: 'clamp(10px, 1.1vw, 13px)',
+                                    fontWeight: 'bold',
+                                    padding: '2px 7px',
+                                    borderRadius: 4,
+                                    whiteSpace: 'nowrap',
+                                    pointerEvents: 'none',
+                                }}>{whenBadge}</span>
+                                {/* Title row */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                                    <span style={{
+                                        color: 'rgba(255,255,255,0.9)',
+                                        fontSize: 'clamp(16px, 1.9vw, 23px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                    }}>{ev.title}</span>
+                                </div>
+                                {/* Second line — scheduled time */}
+                                <div style={{ display: 'flex', gap: 11, alignItems: 'center' }}>
+                                    <span style={{
+                                        color: 'white',
+                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                    }}>📅 {occLabel}</span>
+                                </div>
+                                {/* Third line — remaining · assigned to */}
+                                <div style={{ display: 'flex', gap: 11, alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <span style={{
+                                        color: '#fbbf24',
+                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                    }}>⏳ {EventsService.formatMinutes(ev.minutesRemaining)}</span>
                                     {ev.assigned_to && (
                                         <span style={{
                                             color: '#fbbf24',
@@ -1510,21 +1705,6 @@ export default function Clock() {
                                             textAlign: 'right',
                                         }}>👤 {ev.assigned_to}</span>
                                     )}
-                                </div>
-                                {/* Second line — scheduled time · remaining */}
-                                <div style={{ display: 'flex', gap: 11, alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <span style={{
-                                        color: 'white',
-                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
-                                        fontWeight: 'bold',
-                                        whiteSpace: 'nowrap',
-                                    }}>📅 {occLabel}</span>
-                                    <span style={{
-                                        color: '#fbbf24',
-                                        fontSize: 'clamp(13px, 1.5vw, 18px)',
-                                        fontWeight: 'bold',
-                                        whiteSpace: 'nowrap',
-                                    }}>⏳ {EventsService.formatMinutes(ev.minutesRemaining)}</span>
                                 </div>
                             </div>
                             )
@@ -1546,47 +1726,50 @@ export default function Clock() {
                     <div style={{
                         position: 'fixed',
                         bottom: BOTTOM_BAR + 12,
-                        left: isPortrait ? '50%' : SIDE_TOTAL_L + 16,
+                        left: isPortrait ? '50%' : (isPortableLandscape ? 4 : SIDE_TOTAL_L + 16),
                         transform: isPortrait ? 'translateX(-50%)' : undefined,
                         zIndex: 98,
                         display: 'flex',
-                        flexDirection: 'row',
-                        alignItems: 'baseline',
-                        gap: 10,
+                        flexDirection: isPortableLandscape ? 'column' : 'row',
+                        alignItems: isPortableLandscape ? 'flex-start' : 'baseline',
+                        gap: isPortableLandscape ? 2 : 10,
                         direction: 'ltr',
                         pointerEvents: 'none',
                         fontFamily: calibri,
                         textShadow,
                         whiteSpace: 'nowrap',
                     }}>
-                        {/* Day name — same size as year, amber weekday, green weekend */}
+                        {/* Day name — top line in portable-landscape */}
                         <span style={{
                             fontSize: 'clamp(22px, 3.4vw, 56px)',
                             fontWeight: 'normal',
                             lineHeight: 1.15,
                             color: accentColor,
                         }}>{dayName}</span>
-                        {/* Month name — white, large */}
-                        <span style={{
-                            fontSize: 'clamp(28px, 4.2vw, 68px)',
-                            fontWeight: 'bold',
-                            lineHeight: 1.15,
-                            color: 'rgba(255,255,255,0.92)',
-                        }}>{monthName}</span>
-                        {/* Day number — amber weekday, green weekend, large */}
-                        <span style={{
-                            fontSize: 'clamp(28px, 4.2vw, 68px)',
-                            fontWeight: 'bold',
-                            lineHeight: 1.15,
-                            color: accentColor,
-                        }}>{currentGregorianDay},</span>
-                        {/* Year — same size as day name, white */}
-                        <span style={{
-                            fontSize: 'clamp(22px, 3.4vw, 56px)',
-                            fontWeight: 'normal',
-                            lineHeight: 1.15,
-                            color: 'rgba(255,255,255,0.85)',
-                        }}>{currentGregorianYear}</span>
+                        {/* Date line: Month Day, Year */}
+                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+                            {/* Month name — white, large */}
+                            <span style={{
+                                fontSize: 'clamp(28px, 4.2vw, 68px)',
+                                fontWeight: 'bold',
+                                lineHeight: 1.15,
+                                color: 'rgba(255,255,255,0.92)',
+                            }}>{monthName}</span>
+                            {/* Day number — amber weekday, green weekend, large */}
+                            <span style={{
+                                fontSize: 'clamp(28px, 4.2vw, 68px)',
+                                fontWeight: 'bold',
+                                lineHeight: 1.15,
+                                color: accentColor,
+                            }}>{currentGregorianDay},</span>
+                            {/* Year — same size as day name, white */}
+                            <span style={{
+                                fontSize: 'clamp(22px, 3.4vw, 56px)',
+                                fontWeight: 'normal',
+                                lineHeight: 1.15,
+                                color: 'rgba(255,255,255,0.85)',
+                            }}>{currentGregorianYear}</span>
+                        </div>
                     </div>
                 )
             })()}
@@ -1608,50 +1791,78 @@ export default function Clock() {
                 const isFriday   = currentDayOfWeek === 5
                 const isRamadan  = currentHijriMonth === 9
                 return (
+                    <>
                     <div style={{
                         position: 'fixed',
                         bottom: BOTTOM_BAR + 12,
-                        right: SIDE_TOTAL_R + 16,
+                        right: isPortableLandscape ? 10 : SIDE_TOTAL_R + 16,
                         zIndex: 98,
                         display: 'flex',
-                        flexDirection: 'row',
-                        alignItems: 'baseline',
-                        gap: 12,
+                        flexDirection: isPortableLandscape ? 'column' : 'row',
+                        alignItems: isPortableLandscape ? 'flex-end' : 'baseline',
+                        gap: isPortableLandscape ? 2 : 12,
                         direction: 'rtl',
                         pointerEvents: 'none',
                         fontFamily: calibri,
                         textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
                         whiteSpace: 'nowrap',
                     }}>
-                        {/* Day name — green on Friday, amber otherwise */}
+                        {/* Day name — in portable-landscape rendered separately at right edge; in other modes inline here */}
+                        {!isPortableLandscape && (
                         <span style={{
                             fontSize: 'clamp(28px, 4.2vw, 68px)',
                             fontWeight: 'bold',
                             lineHeight: 1.15,
                             color: isFriday ? '#4ade80' : '#fbbf24',
+                            alignSelf: 'flex-end',
+                            textAlign: 'right',
                         }}>{arabicDayName}</span>
-                        {/* Day number — always white */}
-                        <span style={{
-                            fontSize: 'clamp(28px, 4.2vw, 68px)',
-                            fontWeight: 'bold',
-                            lineHeight: 1.15,
-                            color: 'rgba(255,255,255,0.92)',
-                        }}>{arabicDay}</span>
-                        {/* Month name — green in Ramadan, amber otherwise */}
-                        <span style={{
-                            fontSize: 'clamp(28px, 4.2vw, 68px)',
-                            fontWeight: 'bold',
-                            lineHeight: 1.15,
-                            color: isRamadan ? '#4ade80' : '#fbbf24',
-                        }}>{arabicMonthName}</span>
-                        {/* Hijri year */}
-                        <span style={{
-                            fontSize: 'clamp(22px, 3.4vw, 56px)',
-                            fontWeight: 'normal',
-                            lineHeight: 1.15,
-                            color: 'rgba(255,255,255,0.85)',
-                        }}>{arabicYear} هـ</span>
+                        )}
+                        {/* Date line: day number · month · year */}
+                        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'baseline', gap: 12, direction: 'rtl', justifyContent: 'flex-end' }}>
+                            {/* Day number — always white */}
+                            <span style={{
+                                fontSize: 'clamp(28px, 4.2vw, 68px)',
+                                fontWeight: 'bold',
+                                lineHeight: 1.15,
+                                color: 'rgba(255,255,255,0.92)',
+                            }}>{arabicDay}</span>
+                            {/* Month name — green in Ramadan, amber otherwise */}
+                            <span style={{
+                                fontSize: 'clamp(28px, 4.2vw, 68px)',
+                                fontWeight: 'bold',
+                                lineHeight: 1.15,
+                                color: isRamadan ? '#4ade80' : '#fbbf24',
+                            }}>{arabicMonthName}</span>
+                            {/* Hijri year */}
+                            <span style={{
+                                fontSize: 'clamp(22px, 3.4vw, 56px)',
+                                fontWeight: 'normal',
+                                lineHeight: 1.15,
+                                color: 'rgba(255,255,255,0.85)',
+                            }}>{arabicYear} هـ</span>
+                        </div>
                     </div>
+                    {/* Day name for portable-landscape — pinned to right screen edge, above the date line */}
+                    {isPortableLandscape && (
+                        <span style={{
+                            position: 'fixed',
+                            bottom: `calc(${BOTTOM_BAR + 12}px + clamp(32px, 4.83vw, 78px) + 4px)`,
+                            right: 10,
+                            zIndex: 98,
+                            fontSize: 'clamp(28px, 4.2vw, 68px)',
+                            fontWeight: 'bold',
+                            lineHeight: 1.15,
+                            color: isFriday ? '#4ade80' : '#fbbf24',
+                            textAlign: 'right',
+                            direction: 'rtl',
+                            pointerEvents: 'none',
+                            fontFamily: calibri,
+                            textShadow: '0 2px 4px rgba(0,0,0,1), 0 4px 12px rgba(0,0,0,0.95), 0 8px 24px rgba(0,0,0,0.85), 2px 2px 0 rgba(0,0,0,0.9), -2px -2px 0 rgba(0,0,0,0.9)',
+                            whiteSpace: 'nowrap',
+                        }}>{arabicDayName}</span>
+                    )}
+                    </>
                 )
             })()}
 
@@ -1663,6 +1874,9 @@ export default function Clock() {
                     : null;
                 const locationAddress = toTitleCase(locationSettings?.address) || null;
                 const locationCountry = toTitleCase(weatherData.country) || null;
+                // In landscape/desktop/portable-landscape: weather is drawn on canvas — hide HTML overlay
+                if (profile === 'landscape' || profile === 'desktop' || profile === 'portable-landscape')
+                    return null;
                 return (
                     <div style={{
                         position: 'fixed',
@@ -1760,7 +1974,14 @@ export default function Clock() {
                 );
             })()}
             <div className='d-flex flex-row h-100 align-items-center justify-content-center'
-                style={{ overflow: 'hidden', paddingTop: TOP_BAR, paddingBottom: BOTTOM_BAR, paddingLeft: SIDE_TOTAL_L, paddingRight: SIDE_TOTAL_R }}>
+                style={{
+                    overflow: 'hidden',
+                    paddingTop: TOP_BAR,
+                    paddingBottom: BOTTOM_BAR,
+                    paddingLeft: SIDE_TOTAL_L,
+                    paddingRight: SIDE_TOTAL_R,
+                    justifyContent: 'flex-start',
+                }}>
                 <div ref={driftRef}>
                     <div ref={dragWrapperRef}
                         onPointerDown={handlePointerDown}
