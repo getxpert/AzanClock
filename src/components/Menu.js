@@ -8,6 +8,7 @@ import Alarms from './Alarms';
 import About from './About';
 import { AppContext } from '../AppContext';
 import { FontAwesome } from '../data/FontAwesome';
+import getxpertLogo from '../images/getxpert.png'
 
 
 export default function Menu() {
@@ -50,7 +51,7 @@ export default function Menu() {
                             <li className='nav-item'>
                                 <button className="nav-link fs-4" id="about-tab" data-bs-toggle="tab"
                                     data-bs-target="#about" type="button" role="tab">
-                                    {FontAwesome.Info}
+                                     <img src={getxpertLogo} alt="About" width="42" height="42" className="rounded" />
                                 </button>
                             </li>
                         </ul>

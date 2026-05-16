@@ -126,8 +126,8 @@ export default function Settings() {
                 <Options name="deviceSettings.clockStyle" selectedValue={deviceSettings.clockStyle}
                     values={[
                         { id: 'A', name: '🕐 Analogue' },
-                        { id: 'D', name: '🔢 Digital'  },
-                        { id: 'B', name: '⊕ Both'      },
+                        { id: 'D', name: '🔢 Digital'  }
+                  
                     ]} />
             </div>
 
@@ -137,6 +137,28 @@ export default function Settings() {
                     values={[
                         { id: '12', name: '🕛 12-hour' },
                         { id: '24', name: '🕐 24-hour' },
+                    ]} />
+            </div>
+
+            <div className="mt-2">
+                <span className='badge mb-1 p-0'>Events in Sidebar</span>
+                <Options name="deviceSettings.eventsCount" selectedValue={String(deviceSettings.eventsCount ?? 3)}
+                    values={[
+                        { id: '1', name: '1 event'  },
+                        { id: '2', name: '2 events' },
+                        { id: '3', name: '3 events' },
+                        { id: '4', name: '4 events' },
+                        { id: '5', name: '5 events' },
+                    ]} />
+            </div>
+
+            <div className="mt-2">
+                <span className='badge mb-1 p-0'>Hadith Language</span>
+                <Options name="deviceSettings.hadithLang" selectedValue={deviceSettings.hadithLang || 'both'}
+                    values={[
+                        { id: 'arabic',  name: '🕌 Arabic only'  },
+                        { id: 'english', name: '🌐 English only' },
+                        { id: 'both',    name: '🌍 Both'         },
                     ]} />
             </div>
 

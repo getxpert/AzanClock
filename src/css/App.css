@@ -14,7 +14,9 @@ body {
   background-color: black;
   position: relative;
 }
-
+.rounded{
+  margin-top: -2px;
+}
 body::before {
   content: '';
   position: fixed;
