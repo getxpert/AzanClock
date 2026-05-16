@@ -9,6 +9,7 @@ import Clock from './components/Clock';
 import AudioPlayer from './components/AudioPlayer';
 import SilkSilentAudio from './components/SilkSilentAudio'
 import { weatherService } from './services/WeatherService';
+import { versionService } from './services/VersionService';
 
 export const AppContext = React.createContext();
 
@@ -84,7 +85,30 @@ export default function AppContextProvider() {
                 });
             }
         }
-        
+
+        // Initialize version service — shows a toast when a newer version is
+        // available on the server and triggers a SW update check.
+        versionService.initialize((updateInfo) => {
+            showPersistentToast(
+                <div>
+                    <div><strong>New version available: v{updateInfo.version}</strong></div>
+                    {updateInfo.releaseNotes && (
+                        <div style={{ fontSize: '0.85em', marginTop: 4 }}>{updateInfo.releaseNotes}</div>
+                    )}
+                    <div style={{ fontSize: '0.85em', marginTop: 6 }}>
+                        The app will update automatically. You can also{' '}
+                        <span
+                            style={{ textDecoration: 'underline', cursor: 'pointer' }}
+                            onClick={() => window.location.reload()}
+                        >
+                            reload now
+                        </span>
+                        .
+                    </div>
+                </div>
+            );
+        });
+        /*
         // If not running under azanclock.com, show a persistent toast advising re-install
         try {
             const hostname = (window.location.hostname || '').toLowerCase();
@@ -104,10 +128,12 @@ export default function AppContextProvider() {
         } catch (e) {
             // ignore errors (e.g., window not available)
         }
+        */
         
-        // Cleanup: stop weather service when component unmounts
+        // Cleanup: stop weather service and version service when component unmounts
         return () => {
             weatherService.stop();
+            versionService.stop();
         };
     }, [])
 

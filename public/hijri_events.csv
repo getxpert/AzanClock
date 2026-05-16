@@ -1,0 +1,13 @@
+id	assigned_by	assigned_to	salah_name	NotifyMinutes	hijri_day_start	hijri_day_end	frequency	days	category	colour_code	location	priority	title	description
+101	Dad	All	Maghrib	60	01/01/1446	01/12/1450	Annual	Day	Islamic	#FFD700ff	Home	High	Islamic New Year	1st of Muharram - New Hijri Year begins at Maghrib
+102	Dad	All	Maghrib	60	10/01/1446	10/01/1450	Annual	Day	Islamic	#FF6B35ff	Home	High	Day of Ashura	10th of Muharram - Day of fasting
+103	Dad	All	Maghrib	60	12/03/1446	12/03/1450	Annual	Day	Islamic	#4CAF50ff	Home	High	Mawlid al-Nabi	12th of Rabi Al-Awwal - Birth of the Prophet ﷺ
+104	Dad	All	Maghrib	60	27/07/1446	27/07/1450	Annual	Day	Islamic	#9C27B0ff	Home	High	Laylat al-Miraj	27th of Rajab - Night Journey of the Prophet ﷺ
+105	Dad	All	Maghrib	60	15/08/1446	15/08/1450	Annual	Day	Islamic	#2196F3ff	Home	High	Laylat al-Bara'at	15th of Sha'ban - Night of Forgiveness
+106	Dad	All	Fajr	60	01/09/1446	01/09/1450	Annual	Day	Islamic	#FF9800ff	Home	High	Ramadan Begins	1st of Ramadan - Month of fasting begins
+107	Dad	All	Maghrib	30	01/09/1446	30/09/1450	Annual	Day	Islamic	#FF5722ff	Home	High	Iftar	Break the fast at Maghrib during Ramadan
+108	Dad	All	Fajr	30	01/09/1446	30/09/1450	Annual	Day	Islamic	#795548ff	Home	High	Suhoor Reminder	Last meal before Fajr during Ramadan
+109	Dad	All	Maghrib	60	27/09/1446	27/09/1450	Annual	Day	Islamic	#E91E63ff	Home	High	Laylat al-Qadr	27th of Ramadan - Night of Power
+110	Dad	All	Maghrib	60	01/10/1446	01/10/1450	Annual	Day	Islamic	#00BCD4ff	Home	High	Eid al-Fitr	1st of Shawwal - Eid prayer in the morning
+111	Dad	All	Maghrib	60	09/12/1446	09/12/1450	Annual	Day	Islamic	#8BC34Aff	Home	High	Day of Arafah	9th of Dhul Hijjah - Day of fasting
+112	Dad	All	Maghrib	60	10/12/1446	10/12/1450	Annual	Day	Islamic	#F44336ff	Home	High	Eid al-Adha	10th of Dhul Hijjah - Eid of Sacrifice

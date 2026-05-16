@@ -11,6 +11,8 @@ export default function HadithDisplay({ dailyHadith, hadithExpanded, setHadithEx
     // In English-only mode the collapsed hint says "tap to expand" since there's no translation to reveal
     const collapsedHint = showEnglish && !showArabic ? 'tap to expand' : 'tap to read translation'
 
+    const isPortraitMode = profile === 'portable-portrait'
+
     return (
         <div
             onClick={() => setHadithExpanded(e => !e)}
@@ -23,6 +25,15 @@ export default function HadithDisplay({ dailyHadith, hadithExpanded, setHadithEx
                     ? {
                         left: 'calc((100vw + 91vh) / 2 + 8px)',
                         right: 10,
+                        width: 'auto',
+                    }
+                    : {}
+                ),
+                ...(isPortraitMode
+                    ? {
+                        top: TOP_BAR + 6,
+                        left: 8,
+                        right: 8,
                         width: 'auto',
                     }
                     : {}
@@ -47,7 +58,7 @@ export default function HadithDisplay({ dailyHadith, hadithExpanded, setHadithEx
             {showArabic && (
                 <span style={{
                     color: 'white',
-                    fontSize: 'clamp(20px, 2.0vw, 26px)',
+                    fontSize: isPortraitMode ? 'clamp(15px, 4vw, 22px)' : 'clamp(20px, 2.0vw, 26px)',
                     lineHeight: 1.75,
                     textAlign: 'right',
                     direction: 'rtl',
@@ -69,7 +80,7 @@ export default function HadithDisplay({ dailyHadith, hadithExpanded, setHadithEx
                 {showEnglish && (
                     <span style={{
                         color: 'white',
-                        fontSize: 'clamp(18px, 1.8vw, 24px)',
+                        fontSize: isPortraitMode ? 'clamp(13px, 3.5vw, 20px)' : 'clamp(18px, 1.8vw, 24px)',
                         lineHeight: 1.5,
                         textAlign: 'left',
                         direction: 'ltr',
@@ -81,7 +92,7 @@ export default function HadithDisplay({ dailyHadith, hadithExpanded, setHadithEx
                 {/* Reference + Type — always in yellow English */}
                 <span style={{
                     color: '#fbbf24',
-                    fontSize: 'clamp(18px, 1.7vw, 22px)',
+                    fontSize: isPortraitMode ? 'clamp(12px, 3.2vw, 18px)' : 'clamp(18px, 1.7vw, 22px)',
                     lineHeight: 1.3,
                     textAlign: 'left',
                     direction: 'ltr',
@@ -94,7 +105,7 @@ export default function HadithDisplay({ dailyHadith, hadithExpanded, setHadithEx
             {!hadithExpanded && (
                 <span style={{
                     color: 'rgba(251,191,36,0.7)',
-                    fontSize: 'clamp(13px, 1.3vw, 16px)',
+                    fontSize: isPortraitMode ? 'clamp(11px, 2.8vw, 14px)' : 'clamp(13px, 1.3vw, 16px)',
                     textAlign: 'center',
                     fontStyle: 'italic',
                     flexShrink: 0,

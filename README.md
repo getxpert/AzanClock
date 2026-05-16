@@ -2,7 +2,7 @@
 
 Transform any device into a fully functional **Azan Clock** — for free!
 
-Use [AzanClock.com](https://azanclock.com) to display accurate prayer times and play the adhan (call to prayer) automatically on:
+Use [AzanClock.com](https://azanclock.com) to display accurate prayer times and play the Azan (call to prayer) automatically on:
 
 - 🟢 **Android tablets & phones**
 - 🟢 **Amazon Echo Show devices**

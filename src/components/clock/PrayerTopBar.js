@@ -13,10 +13,12 @@ const arabicPrayerNames = {
     Isha: 'العشاء',
 }
 
-export default function PrayerTopBar({ vakits, currentVakit, nextVakit, time, TOP_BAR, SIDE_TOTAL_L, SIDE_TOTAL_R, isPortableLandscape, dim }) {
+export default function PrayerTopBar({ vakits, currentVakit, nextVakit, time, TOP_BAR, SIDE_TOTAL_L, SIDE_TOTAL_R, isPortableLandscape, isPortrait, dim }) {
     const rtlVakits = vakits ? [...vakits].reverse() : []
     const prayerFont = isPortableLandscape
         ? `clamp(8.4px, 2.8vw, 4.2vh)`
+        : isPortrait
+        ? `clamp(13px, 3.6vw, 20px)`
         : `clamp(8.4px, 2.45vw, 3.5vh)`
 
     // Convert "H:MM" or "HH:MM" to total minutes since midnight
@@ -55,47 +57,52 @@ export default function PrayerTopBar({ vakits, currentVakit, nextVakit, time, TO
                 return (
                     <div key={i} style={{
                         flex: 1,
-                        display: 'flex', flexDirection: 'row',
+                        display: 'flex',
+                        flexDirection: isPortrait ? 'column' : 'row',
                         alignItems: 'center', justifyContent: 'center',
-                        padding: '0 8px',
+                        padding: isPortrait ? '3px 4px' : '0 8px',
                         fontWeight: isCurrent ? 'bold' : 'normal',
                         color: isCurrent ? 'white' : 'rgba(255,255,255,1)',
                         background: prayerHlBg(v),
                         borderRadius: 6,
                         overflow: 'hidden',
-                        gap: 10,
+                        gap: isPortrait ? 1 : 10,
                     }}>
-                        {/* Time — amber when not current, white when current */}
+                        {/* Arabic name — top line in portrait */}
+                        <span style={{
+                            fontSize: prayerFont,
+                            direction: 'rtl',
+                            whiteSpace: 'nowrap',
+                            color: 'white',
+                            lineHeight: 1.1,
+                        }}>
+                            {arabicPrayerNames[v.name] || v.name}
+                        </span>
+                        {/* Time — bottom line in portrait */}
                         <span style={{
                             display: 'inline-flex', alignItems: 'baseline',
-                            gap: 3, direction: 'ltr', whiteSpace: 'nowrap',
+                            gap: 2, direction: 'ltr', whiteSpace: 'nowrap',
                         }}>
                             <span style={{
                                 fontSize: prayerFont,
                                 fontFamily: calibri,
                                 letterSpacing: '0.04em',
                                 color: isCurrent ? 'white' : '#FFC800',
+                                lineHeight: 1.1,
                             }}>
                                 {v.displayTime}
                             </span>
-                            <span style={{
-                                fontSize: `clamp(4.9px, 1.4vw, 2.45vh)`,
-                                fontFamily: calibri,
-                                letterSpacing: 0,
-                                opacity: 0.85,
-                                color: isCurrent ? 'white' : '#FFC800',
-                            }}>
-                                {parseInt(v.time.split(':')[0], 10) < 12 ? 'AM' : 'PM'}
-                            </span>
-                        </span>
-                        {/* Arabic name — white always */}
-                        <span style={{
-                            fontSize: prayerFont,
-                            direction: 'rtl',
-                            whiteSpace: 'nowrap',
-                            color: 'white',
-                        }}>
-                            {arabicPrayerNames[v.name] || v.name}
+                            {!isPortrait && (
+                                <span style={{
+                                    fontSize: `clamp(4.9px, 1.4vw, 2.45vh)`,
+                                    fontFamily: calibri,
+                                    letterSpacing: 0,
+                                    opacity: 0.85,
+                                    color: isCurrent ? 'white' : '#FFC800',
+                                }}>
+                                    {parseInt(v.time.split(':')[0], 10) < 12 ? 'AM' : 'PM'}
+                                </span>
+                            )}
                         </span>
                     </div>
                 )

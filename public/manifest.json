@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "short_name": "AdhanClock",
-  "name": "Adhan Clock",
-  "description": "Online Adhan Clock - Muslim Prayer Times",
+  "short_name": "Salah",
+  "name": "Salah Clock",
+  "description": "Online Salah Clock - Muslim Prayer Times",
   "icons": [
     { "src": "/icon48.png", "sizes": "48x48", "type": "image/png", "purpose": "maskable" },
     { "src": "/icon72.png", "sizes": "72x72", "type": "image/png", "purpose": "maskable" },

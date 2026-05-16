@@ -16,6 +16,9 @@ export default function DateOverlay({
     isPortableLandscape,
     dim
 }) {
+    // Portrait uses the same column layout as portable-landscape
+    const isPortablePortrait = profile === 'portable-portrait'
+    const useColumnLayout = isPortableLandscape || isPortablePortrait
     const now = new Date()
     const tzID = locationSettings?.timeZoneID || 'UTC'
     const localNow = new Date(now.toLocaleString('en-US', { timeZone: tzID }))
@@ -88,13 +91,13 @@ export default function DateOverlay({
             <div style={{
                 position: 'fixed',
                 bottom: BOTTOM_BAR + 4,
-                left: isPortrait ? '50%' : (isPortableLandscape ? 4 : SIDE_TOTAL_L + 16),
-                transform: isPortrait ? 'translateX(-50%)' : undefined,
+                left: isPortrait ? (isPortablePortrait ? 4 : '50%') : (isPortableLandscape ? 4 : SIDE_TOTAL_L + 16),
+                transform: (isPortrait && !isPortablePortrait) ? 'translateX(-50%)' : undefined,
                 zIndex: 98,
                 display: 'flex',
-                flexDirection: isPortableLandscape ? 'column' : 'row',
-                alignItems: isPortableLandscape ? 'flex-start' : 'baseline',
-                gap: isPortableLandscape ? 2 : 10,
+                flexDirection: useColumnLayout ? 'column' : 'row',
+                alignItems: useColumnLayout ? 'flex-start' : 'baseline',
+                gap: useColumnLayout ? 2 : 10,
                 direction: 'ltr',
                 pointerEvents: 'none',
                 fontFamily: calibri,
@@ -132,18 +135,18 @@ export default function DateOverlay({
                 </div>
             </div>
 
-            {/* Islamic date overlay — bottom-right (hidden in portrait) */}
-            {!isPortrait && (
+            {/* Islamic date overlay — bottom-right (hidden only in non-portable portrait) */}
+            {(!isPortrait || isPortablePortrait) && (
                 <>
                     <div style={{
                         position: 'fixed',
                         bottom: BOTTOM_BAR + 4,
-                        right: isPortableLandscape ? 10 : SIDE_TOTAL_R + 16,
+                        right: useColumnLayout ? 10 : SIDE_TOTAL_R + 16,
                         zIndex: 98,
                         display: 'flex',
-                        flexDirection: isPortableLandscape ? 'column' : 'row',
-                        alignItems: isPortableLandscape ? 'flex-end' : 'baseline',
-                        gap: isPortableLandscape ? 2 : 12,
+                        flexDirection: useColumnLayout ? 'column' : 'row',
+                        alignItems: useColumnLayout ? 'flex-end' : 'baseline',
+                        gap: useColumnLayout ? 2 : 12,
                         direction: 'rtl',
                         pointerEvents: 'none',
                         fontFamily: calibri,
@@ -151,8 +154,8 @@ export default function DateOverlay({
                         whiteSpace: 'nowrap',
                         opacity: dim === 1 ? 0.25 : 1,
                     }}>
-                        {/* Day name — inline for non-portable-landscape */}
-                        {!isPortableLandscape && (
+                        {/* Day name — inline for non-column layout */}
+                        {!useColumnLayout && (
                             <span style={{
                                 fontSize: 'clamp(28px, 4.2vw, 68px)',
                                 fontWeight: 'bold',
@@ -184,8 +187,8 @@ export default function DateOverlay({
                             }}>{arabicYear} هـ</span>
                         </div>
                     </div>
-                    {/* Day name for portable-landscape — pinned to right screen edge */}
-                    {isPortableLandscape && (
+                    {/* Day name for column layout — pinned to right screen edge */}
+                    {useColumnLayout && (
                         <span style={{
                             position: 'fixed',
                             bottom: `calc(${BOTTOM_BAR + 4}px + clamp(32px, 4.83vw, 78px) + 4px)`,

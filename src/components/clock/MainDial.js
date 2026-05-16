@@ -96,8 +96,24 @@ export default function MainDial({
             .drawCircle(ctx, 482, black, 9)
 
         if (showDigital) {
+            // Fit the time string — use a fixed reference "00:00" so both 12h and 24h
+            // get the same font size regardless of how many digits the current time has
+            const innerR = 448
+            const targetW = innerR * 2 * 0.72 * 1.3
+            let timeFontSize = showAnalogue ? 120 : 220
+            if (!showAnalogue) {
+                const refStr = '00:00'
+                let lo = 80, hi = 420
+                while (hi - lo > 2) {
+                    const mid = Math.floor((lo + hi) / 2)
+                    ctx.font = `bold ${mid}px Arial`
+                    if (ctx.measureText(refStr).width <= targetW) lo = mid
+                    else hi = mid
+                }
+                timeFontSize = lo
+            }
             if (dim === 1) ctx.globalAlpha = 0.25
-            sac.print(ctx, bigTime, 220, white, 0)
+            sac.print(ctx, bigTime, timeFontSize, white, 0)
             if (dim === 1) ctx.globalAlpha = 1
         }
 
@@ -187,7 +203,7 @@ export default function MainDial({
             })()
 
             // Weather / moon block inside dial
-            if (profile === 'landscape' || profile === 'desktop' || profile === 'portable-landscape') {
+            if (profile === 'landscape' || profile === 'desktop' || profile === 'portable-landscape' || profile === 'portable-portrait') {
                 const _afterSunset = currentVakit &&
                     (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
 
@@ -288,12 +304,143 @@ export default function MainDial({
                 }
             }
         } else {
-            // Digital / Both — original layout
-            sac.print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, white, 109)
-                .print(ctx, nextText, 156, white, 223)
+            // Digital-only layout:
+            //   [prayer name — white, large]
+            //   [icon/moon]  [temp — same size as prayer name]
+            //   [location — amber]
+            //   [big time — centred at y=0, drawn by showDigital block above]
+            //   [elapsed — amber]
+            //   [countdown]
 
-            if (currentArcVakit.name !== 'Duhaend')
-                sac.print(ctx, arabicPrayerNames[currentArcVakit.name] || currentArcVakit.name, 56, white, -191)
+            const _afterSunset = currentVakit &&
+                (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
+
+            const _weatherIcon = weatherData ? (() => {
+                const code = weatherData.weatherCode
+                if (code === 0) return '☀️'
+                if (code === 1) return '🌤️'
+                if (code === 2) return '⛅'
+                if (code === 3) return '☁️'
+                if (code === 45 || code === 48) return '🌫️'
+                if (code >= 51 && code <= 57) return '🌦️'
+                if (code >= 61 && code <= 67) return '🌧️'
+                if (code >= 71 && code <= 77) return '❄️'
+                if (code >= 80 && code <= 82) return '🌧️'
+                if (code >= 85 && code <= 86) return '🌨️'
+                if (code >= 95 && code <= 99) return '⛈️'
+                return '🌡️'
+            })() : null
+
+            const showMoon = _afterSunset
+            const showWeather = weatherData && _weatherIcon
+            const cx = size / 2, cy = size / 2
+
+            // Font sizes
+            const salahFontSize = 80   // prayer name
+            const tempFontSize  = 104  // temp 30% bigger
+            const iconSize      = 104  // icon 30% bigger
+            const locFontSize   = 36
+
+            // Vertical stack — everything centred, sitting above the time (y=0)
+            // Work bottom-up: leave ~30px gap above y=0 for the time's ascender
+            const gap = 18
+            const locH    = locFontSize
+            const tempH   = tempFontSize
+            const salahH  = salahFontSize
+
+            // Bottom of stack: location sits just above the time
+            const locY    = -(tempH + gap + locH / 2 + gap + 20) - 10      // ≈ -184
+            const tempRowY = locY - locH / 2 - gap - tempH / 2 + 10         // ≈ -264
+            const salahY  = tempRowY - tempH / 2 - gap - salahH / 2 + 25    // ≈ -347
+
+            // ── Prayer name — white, centred ──────────────────────────────────
+            if (currentArcVakit.name !== 'Duhaend') {
+                ctx.save()
+                ctx.translate(cx, cy)
+                ctx.font = `bold ${salahFontSize}px Arial`
+                ctx.fillStyle = dim === 1 ? 'rgba(255,255,255,0.25)' : white
+                ctx.textBaseline = 'middle'
+                ctx.textAlign = 'center'
+                ctx.fillText(currentArcVakit.name, 0, salahY)
+                ctx.restore()
+            }
+
+            // ── Icon + temp row — centred ─────────────────────────────────────
+            if (showMoon || showWeather) {
+                const numStr = (weatherData?.temperature !== undefined && weatherData?.temperature !== null)
+                    ? String(weatherData.temperature) : ''
+                const unitStr = '°C'
+                ctx.font = `bold ${tempFontSize}px Arial`
+                const numW  = numStr ? ctx.measureText(numStr).width : 0
+                const unitW = numStr ? ctx.measureText(unitStr).width : 0
+                const totalTW = numW + unitW
+
+                const iconGap  = 12
+                const rowW     = iconSize + (totalTW > 0 ? iconGap + totalTW : 0)
+                const rowLeft  = -rowW / 2   // centre the whole group
+                const iconCx   = rowLeft + iconSize / 2
+                const tempLeft = rowLeft + iconSize + iconGap
+
+                // Moon or weather icon
+                if (_afterSunset) {
+                    const moonImg = moonImgRef.current
+                    if (moonImg && moonImg.complete && moonImg.naturalWidth > 0) {
+                        const imgSize = iconSize * 1.1
+                        ctx.save()
+                        ctx.translate(cx + iconCx - imgSize / 2, cy + tempRowY - imgSize / 2)
+                        ctx.drawImage(moonImg, 0, 0, imgSize, imgSize)
+                        ctx.restore()
+                    }
+                } else if (_weatherIcon) {
+                    ctx.save()
+                    ctx.translate(cx, cy)
+                    ctx.font = `${iconSize}px Arial`
+                    ctx.textBaseline = 'middle'
+                    ctx.textAlign = 'center'
+                    ctx.fillText(_weatherIcon, iconCx, tempRowY)
+                    ctx.restore()
+                }
+
+                // Temperature
+                if (numStr) {
+                    const tempColours = getTempColours(weatherData.temperature)
+                    ctx.save()
+                    ctx.translate(cx, cy)
+                    ctx.textBaseline = 'middle'
+                    ctx.font = `bold ${tempFontSize}px Arial`
+                    ctx.textAlign = 'left'
+                    ctx.fillStyle = dim === 1 ? 'rgba(255,255,255,0.25)' : tempColours.number
+                    ctx.fillText(numStr, tempLeft, tempRowY)
+                    ctx.fillStyle = dim === 1 ? 'rgba(255,255,255,0.25)' : tempColours.unit
+                    ctx.fillText(unitStr, tempLeft + numW, tempRowY)
+                    ctx.restore()
+                }
+            }
+
+            // ── Location — amber, centred ─────────────────────────────────────
+            const toTitleCase = (str) => str
+                ? str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                : null
+            const locAddress = toTitleCase(locationSettings?.address) || null
+            if (locAddress) {
+                ctx.save()
+                ctx.translate(cx, cy)
+                ctx.font = `bold ${locFontSize}px Arial`
+                ctx.fillStyle = dim === 1 ? 'rgba(255,200,0,0.25)' : '#FFC800'
+                ctx.textBaseline = 'middle'
+                ctx.textAlign = 'center'
+                ctx.fillText(locAddress, 0, locY)
+                ctx.restore()
+            }
+
+            // ── Below time: elapsed (amber) then countdown ────────────────────
+            const elapsedY   = 124
+            const countdownY = 243
+
+            if (dim === 1) ctx.globalAlpha = 0.25
+            sac.print(ctx, 'Elapsed ' + elapsed + ' · ' + nextVakit.name + ' in', 31, '#FFC800', elapsedY)
+            sac.print(ctx, nextText, 187, white, countdownY)
+            if (dim === 1) ctx.globalAlpha = 1
         }
 
         sac.updateTitle(ctx, 'AzanClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)

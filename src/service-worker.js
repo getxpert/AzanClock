@@ -24,5 +24,7 @@ registerRoute("/privacy-policy/", new NetworkFirst());
 registerRoute(({ url }) => url.hostname === 'cdn.jsdelivr.net', new StaleWhileRevalidate());
 registerRoute("/reset/", new NetworkOnly());
 registerRoute(({ url }) => url.href.includes('mp3quran'), new NetworkOnly());
+// Always fetch version.json from the network so update checks are accurate.
+registerRoute(({ url }) => url.pathname === '/version.json', new NetworkOnly());
 
 

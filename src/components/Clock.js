@@ -35,7 +35,8 @@ export default function Clock() {
     const {
         showMenu, setShowMenu, nextText, todaysDate, hijriDate, locationSettings,
         calculationSettings, deviceSettings, hourAngle, vakits, arcVakits, displayTime, currentVakit, nextVakit, currentArcVakit,
-        elapsed, background, dim, clockOpacity, midnightAngle, oneThirdAngle, twoThirdAngle, alarmSettings, naflAlarmSettings, isWeekDay, weatherData, time, isAudioPlaying
+        elapsed, background, dim, clockOpacity, midnightAngle, oneThirdAngle, twoThirdAngle, alarmSettings, naflAlarmSettings, isWeekDay, weatherData, time, isAudioPlaying,
+        prayerTimes
     } = useContext(AppContext)
 
     const canvasRef = useRef(null)
@@ -94,11 +95,11 @@ export default function Clock() {
         const tick = async () => {
             if (new Date().getSeconds() !== 0) return
 
-            const data = await EventsService.getActiveAndUpcoming(new Date(), 5)
+            const data = await EventsService.getActiveAndUpcoming(new Date(), 5, prayerTimes)
             setEventsData(data)
 
             if (!isAudioPlaying && notifSrc) {
-                const due = await EventsService.getNotificationsDue(new Date())
+                const due = await EventsService.getNotificationsDue(new Date(), prayerTimes)
                 for (const ev of due) {
                     const key = `${ev.id}-${ev.nextOccurrence.toISOString()}`
                     if (notifiedRef.current.has(key)) continue
@@ -117,7 +118,7 @@ export default function Clock() {
             }
         }
 
-        EventsService.getActiveAndUpcoming(new Date(), 5).then(setEventsData)
+        EventsService.getActiveAndUpcoming(new Date(), 5, prayerTimes).then(setEventsData)
 
         const id = setInterval(tick, 1000)
         return () => clearInterval(id)
@@ -231,11 +232,11 @@ export default function Clock() {
             dateOverlayBottom: null,
         },
         'portable-portrait': {
-            TOP_BAR: 40, BOTTOM_BAR: 0,
+            TOP_BAR: 80, BOTTOM_BAR: 0,
             SIDE_INNER: 0, SIDE_OUTER_L: 0, SIDE_OUTER_R: 0,
             showSidePanels: false, showBottomPanel: false, showCornerYears: false,
-            eventsMaxW: 'min(96vw, 480px)',
-            hadithW: null,
+            eventsMaxW: '100vw',
+            hadithW: 'calc(100vw - 16px)',
             weatherIconSize: 'clamp(36px, 7vw, 64px)',
             weatherTempSize: 'clamp(26px, 4.8vw, 53px)',
             weatherLocSize: 'clamp(14px, 2.4vw, 26px)',
@@ -295,6 +296,7 @@ export default function Clock() {
                 SIDE_TOTAL_L={SIDE_TOTAL_L}
                 SIDE_TOTAL_R={SIDE_TOTAL_R}
                 isPortableLandscape={isPortableLandscape}
+                isPortrait={isPortrait}
                 dim={dim}
             />
 
@@ -345,6 +347,7 @@ export default function Clock() {
                 BOTTOM_BAR={BOTTOM_BAR}
                 SIDE_TOTAL_L={SIDE_TOTAL_L}
                 dim={dim}
+                DATE_OVERLAY_H={isPortrait ? 'calc(clamp(22px, 3.4vw, 56px) * 1.15 + clamp(28px, 4.2vw, 68px) * 1.15 + 18px)' : null}
             />
 
             <DateOverlay
@@ -370,6 +373,7 @@ export default function Clock() {
                 PROFILE={PROFILE}
                 TOP_BAR={TOP_BAR}
                 SIDE_TOTAL_L={SIDE_TOTAL_L}
+                clockStyle={deviceSettings.clockStyle || 'A'}
             />
 
             <MainDial
@@ -405,11 +409,12 @@ export default function Clock() {
             <div className='d-flex flex-row h-100 align-items-center justify-content-center'
                 style={{
                     overflow: 'hidden',
-                    paddingTop: TOP_BAR,
+                    paddingTop: isPortrait ? TOP_BAR + 80 : TOP_BAR,
                     paddingBottom: BOTTOM_BAR,
                     paddingLeft: SIDE_TOTAL_L,
                     paddingRight: SIDE_TOTAL_R,
-                    justifyContent: 'flex-start',
+                    justifyContent: isPortrait ? 'center' : 'flex-start',
+                    alignItems: isPortrait ? 'flex-start' : 'center',
                 }}>
                 <div ref={driftRef}>
                     <div ref={dragWrapperRef}

@@ -19,7 +19,7 @@ const getTempColours = (temp) => {
     return (config.default) || { unit: 'white', number: 'white' };
 };
 
-export default function WeatherDisplay({ weatherData, currentVakit, currentHijriDay, locationSettings, profile, PROFILE, TOP_BAR, SIDE_TOTAL_L }) {
+export default function WeatherDisplay({ weatherData, currentVakit, currentHijriDay, locationSettings, profile, PROFILE, TOP_BAR, SIDE_TOTAL_L, clockStyle }) {
     const afterSunset = currentVakit &&
         (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
 
@@ -39,8 +39,11 @@ export default function WeatherDisplay({ weatherData, currentVakit, currentHijri
         return '🌡️';
     })() : null;
 
-    // In landscape/desktop/portable-landscape: weather is drawn on canvas
-    if (profile === 'landscape' || profile === 'desktop' || profile === 'portable-landscape')
+    // In landscape/desktop/portable-landscape/portable-portrait: weather is drawn on canvas
+    // In digital-only mode: weather is drawn on canvas for all profiles
+    if (profile === 'landscape' || profile === 'desktop' || profile === 'portable-landscape' || profile === 'portable-portrait')
+        return null;
+    if (clockStyle === 'D')
         return null;
 
     // Show component if: moon phase after sunset OR weather data available OR location available

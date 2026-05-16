@@ -196,6 +196,10 @@ export const SmartAzanClock = {
             }
         })
 
+        // Expose raw prayer times so consumers (e.g. EventsService) can resolve
+        // salah names to actual clock times for Hijri event scheduling.
+        this.output.prayerTimes = this.prayerTimes;
+
         this.output = { ...this.output, ...this.settings };
         return this.output;
 
