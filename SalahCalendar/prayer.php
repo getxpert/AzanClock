@@ -1,17 +1,17 @@
 <?php
 /**
- * prayer.php — Prayer Times iCalendar Feed
- * Deploy to: prayer.hablullah.app/prayer.php
+ * prayer.php — Prayer Times iCalendar Feed (v2.3 engine)
  *
  * Query parameters:
  *   lat          float     required  Latitude  (-90  to  90)
  *   lng          float     required  Longitude (-180 to 180)
- *   method       int 0–7   default 3 Calculation method
- *                                     0=Jafari  1=Karachi  2=ISNA  3=MWL
- *                                     4=Makkah  5=Egypt    6=Custom 7=Tehran
- *   asr          int 0–1   default 0 Asr juristic: 0=Shafii, 1=Hanafi
- *   before       int       default 0  Minutes before adhan (rounded to 15)
- *   after        int       default 30 Minutes after adhan  (rounded to 15)
+ *   method       string    default MWL  Calculation method key (e.g. MWL, ISNA, Makkah)
+ *                                       Legacy integers 0-7 also accepted for backward compat
+ *   asr          string    default Standard  Asr juristic: Standard or Hanafi
+ *                                       Legacy: 0=Standard, 1=Hanafi
+ *   elv          float     default 0   Elevation in meters
+ *   before       int       default 0   Minutes before adhan (rounded to 5)
+ *   after        int       default 30  Minutes after adhan  (rounded to 5)
  *   hours_before int       default 0   Hours before now to include
  *   hours_after  int       default 720 Hours after  now to include (30 days)
  *   tz           string    default UTC IANA timezone e.g. Europe/London
@@ -19,295 +19,377 @@
  *   location     string    default ""  Location label for calendar name
  *
  * Example:
- *   prayer.php?lat=51.5074&lng=-0.1278&method=3&tz=Europe%2FLondon&before=15&after=30
+ *   prayer.php?lat=51.5074&lng=-0.1278&method=MWL&tz=Europe%2FLondon&before=15&after=30
  */
 
 // =====================================================================
-//  EMBEDDED PrayTime class  (v1.2.2)
-//  © 2007-2010 PrayTimes.org — Hamid Zarrabi-Zadeh — GNU LGPL v3
-//  Source: https://github.com/abodehq/Pray-Times/blob/master/Code/v2/php/PrayTime.php
+//  EMBEDDED PrayTimes class (v2.3)
+//  Port of PrayTimes.js v2.3 by Hamid Zarrabi-Zadeh — GNU LGPL v3
+//  Methods from CalculationMethods.js (AzanClock)
 // =====================================================================
-class PrayTime
+
+class PrayTimes
 {
-    // Calculation methods
-    var $Jafari  = 0;
-    var $Karachi = 1;
-    var $ISNA    = 2;
-    var $MWL     = 3;
-    var $Makkah  = 4;
-    var $Egypt   = 5;
-    var $Custom  = 6;
-    var $Tehran  = 7;
+    // All 23 calculation methods matching CalculationMethods.js
+    private static $methods = [
+        'Algerian'          => ['name' => 'Algerian Ministry of Religious Affairs',          'params' => ['fajr' => 18,   'isha' => 17],                                                    'methodOffsets' => []],
+        'Egypt'             => ['name' => 'Egyptian General Authority of Survey',             'params' => ['fajr' => 19.5, 'isha' => 17.5],                                                  'methodOffsets' => []],
+        'FranceAngle18'     => ['name' => 'France - 18° Angle',                              'params' => ['fajr' => 18,   'isha' => 18],                                                    'methodOffsets' => []],
+        'FranceUOIFAngle12' => ['name' => 'France UOIF - 12° Angle',                         'params' => ['fajr' => 12,   'isha' => 12],                                                    'methodOffsets' => []],
+        'ISNA'              => ['name' => 'ISNA (Islamic Society of North America)',          'params' => ['fajr' => 15,   'isha' => 15],                                                    'methodOffsets' => []],
+        'JAKIM'             => ['name' => 'Jabatan Kemajuan Islam Malaysia',                  'params' => ['fajr' => 20,   'isha' => 18],                                                    'methodOffsets' => []],
+        'Jordan'            => ['name' => 'Jordan Ministry of Awqaf',                         'params' => ['fajr' => 18,   'isha' => 18],                                                    'methodOffsets' => ['maghrib' => 5]],
+        'KEMENAG'           => ['name' => 'Kementrian Agama Indonesia',                       'params' => ['fajr' => 20,   'isha' => 18],                                                    'methodOffsets' => []],
+        'Kuwait'            => ['name' => 'Kuwait',                                           'params' => ['fajr' => 18,   'isha' => 17.5],                                                  'methodOffsets' => []],
+        'UIPTL'             => ['name' => 'London Unified Islamic Prayer Timetable',          'params' => ['fajr' => 12,   'isha' => 12],                                                    'methodOffsets' => []],
+        'MUIS'              => ['name' => 'Majlis Ugama Islam Singapura',                     'params' => ['fajr' => 20,   'isha' => 18],                                                    'methodOffsets' => []],
+        'MoonSightingCommittee' => ['name' => 'Moon Sighting Committee',                      'params' => ['fajr' => 18,   'isha' => 18],                                                    'methodOffsets' => ['dhuhr' => 5, 'maghrib' => 3]],
+        'Habous'            => ['name' => 'Moroccan Ministry of Habous and Islamic Affairs',  'params' => ['fajr' => 19.1, 'isha' => 17],                                                    'methodOffsets' => ['sunrise' => -5, 'dhuhr' => 5, 'maghrib' => 5]],
+        'MWL'               => ['name' => 'Muslim World League',                              'params' => ['fajr' => 18,   'isha' => 17],                                                    'methodOffsets' => []],
+        'Qatar'             => ['name' => 'Qatar',                                            'params' => ['fajr' => 18,   'isha' => '90 min'],                                              'methodOffsets' => []],
+        'Karachi'           => ['name' => 'University of Islamic Sciences, Karachi',          'params' => ['fajr' => 18,   'isha' => 18],                                                    'methodOffsets' => []],
+        'Makkah'            => ['name' => 'Umm Al-Qura University, Makkah',                   'params' => ['fajr' => 18.5, 'isha' => '90 min'],                                              'methodOffsets' => []],
+        'Dubai'             => ['name' => 'UAE / Dubai',                                      'params' => ['fajr' => 18.2, 'isha' => 18.2],                                                  'methodOffsets' => []],
+        'Tunusian'          => ['name' => 'Tunisian Ministry of Religious Affairs',           'params' => ['fajr' => 18,   'isha' => 18],                                                    'methodOffsets' => []],
+        'TurkiyeDiyanet'    => ['name' => 'Türkiye Diyanet İşleri Başkanlığı',                'params' => ['fajr' => 18,   'isha' => 17],                                                    'methodOffsets' => ['sunrise' => -7, 'fajr' => -1, 'dhuhr' => 5, 'asr' => 5, 'maghrib' => 8, 'isha' => 1]],
+        'Diyanet15Degrees'  => ['name' => 'Turkish Diyanet Offsets with 15° Angles',          'params' => ['fajr' => 15,   'isha' => 15],                                                    'methodOffsets' => ['imsak' => -1, 'sunrise' => -9, 'dhuhr' => 5, 'asr' => 5, 'maghrib' => 7, 'isha' => -1]],
+        'Tehran'            => ['name' => 'University of Tehran',                             'params' => ['fajr' => 17.7, 'isha' => 14, 'maghrib' => 5.5, 'midnight' => 'Jafari'],          'methodOffsets' => []],
+    ];
 
-    // Juristic methods
-    var $Shafii = 0;
-    var $Hanafi = 1;
+    private static $defaultParams = ['maghrib' => '0 min', 'midnight' => 'Standard'];
 
-    // High-lat adjustment methods
-    var $None        = 0;
-    var $MidNight    = 1;
-    var $OneSeventh  = 2;
-    var $AngleBased  = 3;
+    private $calcMethod = 'MWL';
+    private $setting = [];
+    private $offset = [];
+    private $lat;
+    private $lng;
+    private $elv;
+    private $timeZone;
+    private $jDate;
 
-    // Time formats
-    var $Time24   = 0;
-    var $Time12   = 1;
-    var $Time12NS = 2;
-    var $Float    = 3;
-
-    var $timeNames   = ['Fajr','Sunrise','Dhuhr','Asr','Sunset','Maghrib','Isha'];
-    var $InvalidTime = '-----';
-
-    var $calcMethod    = 0;
-    var $asrJuristic   = 0;
-    var $dhuhrMinutes  = 0;
-    var $adjustHighLats = 1;
-    var $timeFormat    = 0;
-    var $lat;
-    var $lng;
-    var $timeZone;
-    var $JDate;
-    var $numIterations = 1;
-    var $methodParams  = [];
-
-    function __construct($methodID = 0)
+    public function __construct($method = 'MWL')
     {
-        $this->methodParams[$this->Jafari]  = [16,   0, 4,   0, 14  ];
-        $this->methodParams[$this->Karachi] = [18,   1, 0,   0, 18  ];
-        $this->methodParams[$this->ISNA]    = [15,   1, 0,   0, 15  ];
-        $this->methodParams[$this->MWL]     = [18,   1, 0,   0, 17  ];
-        $this->methodParams[$this->Makkah]  = [18.5, 1, 0,   1, 90  ];
-        $this->methodParams[$this->Egypt]   = [19.5, 1, 0,   0, 17.5];
-        $this->methodParams[$this->Tehran]  = [17.7, 0, 4.5, 0, 14  ];
-        $this->methodParams[$this->Custom]  = [18,   1, 0,   0, 17  ];
-        $this->setCalcMethod($methodID);
-    }
+        $this->setting = [
+            'imsak'    => '10 min',
+            'dhuhr'    => '0 min',
+            'asr'      => 'Standard',
+            'highLats' => 'AngleBased',
+        ];
 
-    function getDatePrayerTimes($year, $month, $day, $latitude, $longitude, $timeZone)
-    {
-        $this->lat      = $latitude;
-        $this->lng      = $longitude;
-        $this->timeZone = $timeZone;
-        $this->JDate    = $this->julianDate($year, $month, $day) - $longitude / (15 * 24);
-        return $this->computeDayTimes();
-    }
-
-    function getPrayerTimes($timestamp, $latitude, $longitude, $timeZone)
-    {
-        $date = getdate($timestamp);
-        return $this->getDatePrayerTimes($date['year'], $date['mon'], $date['mday'],
-                                         $latitude, $longitude, $timeZone);
-    }
-
-    function setCalcMethod($methodID)   { $this->calcMethod   = $methodID; }
-    function setAsrMethod($methodID)    { if ($methodID >= 0 && $methodID <= 1) $this->asrJuristic = $methodID; }
-    function setFajrAngle($angle)       { $this->setCustomParams([$angle, null, null, null, null]); }
-    function setMaghribAngle($angle)    { $this->setCustomParams([null, 0, $angle, null, null]); }
-    function setIshaAngle($angle)       { $this->setCustomParams([null, null, null, 0, $angle]); }
-    function setDhuhrMinutes($minutes)  { $this->dhuhrMinutes = $minutes; }
-    function setMaghribMinutes($minutes){ $this->setCustomParams([null, 1, $minutes, null, null]); }
-    function setIshaMinutes($minutes)   { $this->setCustomParams([null, null, null, 1, $minutes]); }
-
-    function setCustomParams($params)
-    {
-        for ($i = 0; $i < 5; $i++) {
-            $this->methodParams[$this->Custom][$i] = ($params[$i] === null)
-                ? $this->methodParams[$this->calcMethod][$i]
-                : $params[$i];
+        // Apply default params to all methods
+        foreach (self::$methods as $key => &$m) {
+            foreach (self::$defaultParams as $dk => $dv) {
+                if (!isset($m['params'][$dk])) {
+                    $m['params'][$dk] = $dv;
+                }
+            }
         }
-        $this->calcMethod = $this->Custom;
+        unset($m);
+
+        // Set initial method
+        $this->setMethod($method);
+
+        // Init offsets
+        $timeNames = ['imsak','fajr','sunrise','dhuhr','asr','sunset','maghrib','isha'];
+        foreach ($timeNames as $n) {
+            $this->offset[$n] = 0;
+        }
     }
 
-    function setHighLatsMethod($methodID) { $this->adjustHighLats = $methodID; }
-    function setTimeFormat($timeFormat)   { $this->timeFormat     = $timeFormat; }
-
-    function floatToTime24($time)
+    public function setMethod($method)
     {
-        if (is_nan($time)) return $this->InvalidTime;
-        $time    = $this->fixhour($time + 0.5 / 60);
-        $hours   = floor($time);
-        $minutes = floor(($time - $hours) * 60);
-        return $this->twoDigitsFormat($hours) . ':' . $this->twoDigitsFormat($minutes);
+        if (isset(self::$methods[$method])) {
+            $this->calcMethod = $method;
+            $params = self::$methods[$method]['params'];
+            foreach ($params as $id => $val) {
+                $this->setting[$id] = $val;
+            }
+            // Apply method offsets
+            $this->offset = array_fill_keys(['imsak','fajr','sunrise','dhuhr','asr','sunset','maghrib','isha'], 0);
+            $offsets = self::$methods[$method]['methodOffsets'] ?? [];
+            foreach ($offsets as $k => $v) {
+                $this->offset[$k] = $v;
+            }
+        }
     }
 
-    function floatToTime12($time, $noSuffix = false)
+    public function adjust($params)
     {
-        if (is_nan($time)) return $this->InvalidTime;
-        $time    = $this->fixhour($time + 0.5 / 60);
-        $hours   = floor($time);
-        $minutes = floor(($time - $hours) * 60);
-        $suffix  = $hours >= 12 ? ' pm' : ' am';
-        $hours   = ($hours + 12 - 1) % 12 + 1;
-        return $hours . ':' . $this->twoDigitsFormat($minutes) . ($noSuffix ? '' : $suffix);
+        foreach ($params as $id => $val) {
+            $this->setting[$id] = $val;
+        }
     }
 
-    function floatToTime12NS($time) { return $this->floatToTime12($time, true); }
+    public function tune($offsets)
+    {
+        foreach ($offsets as $k => $v) {
+            $this->offset[$k] = $v;
+        }
+    }
 
-    // --- Calculation ---
-    function sunPosition($jd)
+    public function getMethod() { return $this->calcMethod; }
+    public function getMethodName() { return self::$methods[$this->calcMethod]['name'] ?? $this->calcMethod; }
+
+    public static function getAllMethods() { return self::$methods; }
+
+    /**
+     * Get prayer times for a given date.
+     * Returns associative array of float hours for each prayer.
+     */
+    public function getTimes($year, $month, $day, $latitude, $longitude, $timezone, $elevation = 0)
+    {
+        $this->lat      = 1.0 * $latitude;
+        $this->lng      = 1.0 * $longitude;
+        $this->elv      = $elevation ? 1.0 * $elevation : 0;
+        $this->timeZone = 1.0 * $timezone;
+        $this->jDate    = $this->julian($year, $month, $day) - $this->lng / (15 * 24);
+        return $this->computeTimes();
+    }
+
+    // ── Computation ──────────────────────────────────────────────────
+
+    private function computeTimes()
+    {
+        $times = [
+            'imsak' => 5, 'fajr' => 5, 'sunrise' => 6, 'dhuhr' => 12,
+            'asr' => 13, 'sunset' => 18, 'maghrib' => 18, 'isha' => 18,
+        ];
+
+        $times = $this->computePrayerTimes($times);
+        $times = $this->adjustTimes($times);
+
+        // Duha & DuhaEnd
+        $times['duha']    = $times['sunrise'] + 15.0 / 60;
+        $times['duhaend'] = $times['dhuhr'] - 10.0 / 60;
+
+        // Apply method offsets (tune)
+        $times = $this->tuneTimes($times);
+
+        // Imsak gets fajr's offset too
+        $times['imsak'] = $times['imsak'] + ($this->offset['fajr'] ?? 0) / 60;
+        // DuhaEnd gets dhuhr's offset
+        $times['duhaend'] = $times['duhaend'] + ($this->offset['dhuhr'] ?? 0) / 60;
+
+        // Midnight
+        $times['midnight'] = $times['maghrib'] + $this->timeDiff($times['maghrib'], $times['fajr']) / 2;
+
+        return $times;
+    }
+
+    private function computePrayerTimes($times)
+    {
+        $times = $this->dayPortion($times);
+        $params = $this->setting;
+
+        $imsak   = $this->sunAngleTime($this->evalParam($params['imsak']),   $times['imsak'],   'ccw');
+        $fajr    = $this->sunAngleTime($this->evalParam($params['fajr']),    $times['fajr'],    'ccw');
+        $sunrise = $this->sunAngleTime($this->riseSetAngle(),                $times['sunrise'], 'ccw');
+        $dhuhr   = $this->midDay($times['dhuhr']);
+        $asr     = $this->asrTime($this->asrFactor($params['asr']),          $times['asr']);
+        $sunset  = $this->sunAngleTime($this->riseSetAngle(),                $times['sunset']);
+        $maghrib = $this->sunAngleTime($this->evalParam($params['maghrib']), $times['maghrib']);
+        $isha    = $this->sunAngleTime($this->evalParam($params['isha']),    $times['isha']);
+
+        return [
+            'imsak' => $imsak, 'fajr' => $fajr, 'sunrise' => $sunrise, 'dhuhr' => $dhuhr,
+            'asr' => $asr, 'sunset' => $sunset, 'maghrib' => $maghrib, 'isha' => $isha,
+        ];
+    }
+
+    private function adjustTimes($times)
+    {
+        $params = $this->setting;
+
+        // Add timezone offset
+        foreach ($times as $k => &$v) {
+            $v += $this->timeZone - $this->lng / 15;
+        }
+        unset($v);
+
+        // High latitude adjustment
+        if ($params['highLats'] !== 'None') {
+            $times = $this->adjustHighLats($times);
+        }
+
+        // isMin adjustments
+        if ($this->isMin($params['imsak'])) {
+            $times['imsak'] = $times['fajr'] - $this->evalParam($params['imsak']) / 60;
+        }
+        if ($this->isMin($params['maghrib'])) {
+            $times['maghrib'] = $times['sunset'] + $this->evalParam($params['maghrib']) / 60;
+        }
+        if ($this->isMin($params['isha'])) {
+            $times['isha'] = $times['maghrib'] + $this->evalParam($params['isha']) / 60;
+        }
+
+        // Dhuhr offset
+        $times['dhuhr'] += $this->evalParam($params['dhuhr']) / 60;
+
+        return $times;
+    }
+
+    private function tuneTimes($times)
+    {
+        foreach ($times as $k => &$v) {
+            if (isset($this->offset[$k])) {
+                $v += $this->offset[$k] / 60;
+            }
+        }
+        unset($v);
+        return $times;
+    }
+
+    // ── High Latitude Adjustments ────────────────────────────────────
+
+    private function adjustHighLats($times)
+    {
+        $params = $this->setting;
+        $nightTime = $this->timeDiff($times['sunset'], $times['sunrise']);
+
+        $times['imsak']   = $this->adjustHLTime($times['imsak'],   $times['sunrise'], $this->evalParam($params['imsak']),   $nightTime, 'ccw');
+        $times['fajr']    = $this->adjustHLTime($times['fajr'],    $times['sunrise'], $this->evalParam($params['fajr']),    $nightTime, 'ccw');
+        $times['isha']    = $this->adjustHLTime($times['isha'],    $times['sunset'],  $this->evalParam($params['isha']),    $nightTime);
+        $times['maghrib'] = $this->adjustHLTime($times['maghrib'], $times['sunset'],  $this->evalParam($params['maghrib']), $nightTime);
+
+        return $times;
+    }
+
+    private function adjustHLTime($time, $base, $angle, $night, $direction = null)
+    {
+        $portion = $this->nightPortion($angle, $night);
+        $timeDiff = ($direction === 'ccw')
+            ? $this->timeDiff($time, $base)
+            : $this->timeDiff($base, $time);
+        if (is_nan($time) || $timeDiff > $portion) {
+            $time = $base + ($direction === 'ccw' ? -$portion : $portion);
+        }
+        return $time;
+    }
+
+    private function nightPortion($angle, $night)
+    {
+        $method = $this->setting['highLats'];
+        $portion = 0.5; // NightMiddle default
+        if ($method === 'AngleBased') {
+            $portion = 1.0 / 60 * $angle;
+        }
+        if ($method === 'OneSeventh') {
+            $portion = 1.0 / 7;
+        }
+        return $portion * $night;
+    }
+
+    // ── Asr ──────────────────────────────────────────────────────────
+
+    private function asrFactor($asrParam)
+    {
+        $factors = ['Standard' => 1, 'Hanafi' => 2];
+        return $factors[$asrParam] ?? $this->evalParam($asrParam);
+    }
+
+    private function asrTime($factor, $time)
+    {
+        $decl = $this->sunPosition($this->jDate + $time)['declination'];
+        $angle = -$this->darccot($factor + $this->dtan(abs($this->lat - $decl)));
+        return $this->sunAngleTime($angle, $time);
+    }
+
+    // ── Sun Position ─────────────────────────────────────────────────
+
+    private function riseSetAngle()
+    {
+        $angle = 0.0347 * sqrt($this->elv);
+        return 0.833 + $angle;
+    }
+
+    private function midDay($time)
+    {
+        $eqt = $this->sunPosition($this->jDate + $time)['equation'];
+        return $this->fixHour(12 - $eqt);
+    }
+
+    private function sunAngleTime($angle, $time, $direction = null)
+    {
+        $decl = $this->sunPosition($this->jDate + $time)['declination'];
+        $noon = $this->midDay($time);
+        $t = 1.0 / 15 * $this->darccos(
+            (-$this->dsin($angle) - $this->dsin($decl) * $this->dsin($this->lat)) /
+            ($this->dcos($decl) * $this->dcos($this->lat))
+        );
+        return $noon + ($direction === 'ccw' ? -$t : $t);
+    }
+
+    private function sunPosition($jd)
     {
         $D  = $jd - 2451545.0;
-        $g  = $this->fixangle(357.529 + 0.98560028 * $D);
-        $q  = $this->fixangle(280.459 + 0.98564736 * $D);
-        $L  = $this->fixangle($q + 1.915 * $this->dsin($g) + 0.020 * $this->dsin(2 * $g));
+        $g  = $this->fixAngle(357.529 + 0.98560028 * $D);
+        $q  = $this->fixAngle(280.459 + 0.98564736 * $D);
+        $L  = $this->fixAngle($q + 1.915 * $this->dsin($g) + 0.020 * $this->dsin(2 * $g));
         $e  = 23.439 - 0.00000036 * $D;
-        $d  = $this->darcsin($this->dsin($e) * $this->dsin($L));
         $RA = $this->darctan2($this->dcos($e) * $this->dsin($L), $this->dcos($L)) / 15;
-        $RA = $this->fixhour($RA);
-        return [$d, $q / 15 - $RA];
+        $eqt = $q / 15 - $this->fixHour($RA);
+        $decl = $this->darcsin($this->dsin($e) * $this->dsin($L));
+        return ['declination' => $decl, 'equation' => $eqt];
     }
 
-    function equationOfTime($jd) { return $this->sunPosition($jd)[1]; }
-    function sunDeclination($jd) { return $this->sunPosition($jd)[0]; }
-
-    function computeMidDay($t)
+    private function julian($year, $month, $day)
     {
-        return $this->fixhour(12 - $this->equationOfTime($this->JDate + $t));
-    }
-
-    function computeTime($G, $t)
-    {
-        $D = $this->sunDeclination($this->JDate + $t);
-        $Z = $this->computeMidDay($t);
-        $V = 1 / 15 * $this->darccos(
-            (-$this->dsin($G) - $this->dsin($D) * $this->dsin($this->lat)) /
-            ($this->dcos($D) * $this->dcos($this->lat))
-        );
-        return $Z + ($G > 90 ? -$V : $V);
-    }
-
-    function computeAsr($step, $t)
-    {
-        $D = $this->sunDeclination($this->JDate + $t);
-        $G = -$this->darccot($step + $this->dtan(abs($this->lat - $D)));
-        return $this->computeTime($G, $t);
-    }
-
-    function computeTimes($times)
-    {
-        $t       = $this->dayPortion($times);
-        $Fajr    = $this->computeTime(180 - $this->methodParams[$this->calcMethod][0], $t[0]);
-        $Sunrise = $this->computeTime(180 - 0.833, $t[1]);
-        $Dhuhr   = $this->computeMidDay($t[2]);
-        $Asr     = $this->computeAsr(1 + $this->asrJuristic, $t[3]);
-        $Sunset  = $this->computeTime(0.833, $t[4]);
-        $Maghrib = $this->computeTime($this->methodParams[$this->calcMethod][2], $t[5]);
-        $Isha    = $this->computeTime($this->methodParams[$this->calcMethod][4], $t[6]);
-        return [$Fajr, $Sunrise, $Dhuhr, $Asr, $Sunset, $Maghrib, $Isha];
-    }
-
-    function computeDayTimes()
-    {
-        $times = [5, 6, 12, 13, 18, 18, 18];
-        for ($i = 1; $i <= $this->numIterations; $i++) {
-            $times = $this->computeTimes($times);
-        }
-        $times = $this->adjustTimes($times);
-        return $this->adjustTimesFormat($times);
-    }
-
-    function adjustTimes($times)
-    {
-        for ($i = 0; $i < 7; $i++) {
-            $times[$i] += $this->timeZone - $this->lng / 15;
-        }
-        $times[2] += $this->dhuhrMinutes / 60;
-        if ($this->methodParams[$this->calcMethod][1] == 1) {
-            $times[5] = $times[4] + $this->methodParams[$this->calcMethod][2] / 60;
-        }
-        if ($this->methodParams[$this->calcMethod][3] == 1) {
-            $times[6] = $times[5] + $this->methodParams[$this->calcMethod][4] / 60;
-        }
-        if ($this->adjustHighLats != $this->None) {
-            $times = $this->adjustHighLatTimes($times);
-        }
-        return $times;
-    }
-
-    function adjustTimesFormat($times)
-    {
-        if ($this->timeFormat == $this->Float) return $times;
-        for ($i = 0; $i < 7; $i++) {
-            if ($this->timeFormat == $this->Time12)
-                $times[$i] = $this->floatToTime12($times[$i]);
-            elseif ($this->timeFormat == $this->Time12NS)
-                $times[$i] = $this->floatToTime12($times[$i], true);
-            else
-                $times[$i] = $this->floatToTime24($times[$i]);
-        }
-        return $times;
-    }
-
-    function adjustHighLatTimes($times)
-    {
-        $nightTime = $this->timeDiff($times[4], $times[1]);
-        $FajrDiff  = $this->nightPortion($this->methodParams[$this->calcMethod][0]) * $nightTime;
-        if (is_nan($times[0]) || $this->timeDiff($times[0], $times[1]) > $FajrDiff)
-            $times[0] = $times[1] - $FajrDiff;
-        $IshaAngle = ($this->methodParams[$this->calcMethod][3] == 0)
-            ? $this->methodParams[$this->calcMethod][4] : 18;
-        $IshaDiff = $this->nightPortion($IshaAngle) * $nightTime;
-        if (is_nan($times[6]) || $this->timeDiff($times[4], $times[6]) > $IshaDiff)
-            $times[6] = $times[4] + $IshaDiff;
-        $MaghribAngle = ($this->methodParams[$this->calcMethod][1] == 0)
-            ? $this->methodParams[$this->calcMethod][2] : 4;
-        $MaghribDiff = $this->nightPortion($MaghribAngle) * $nightTime;
-        if (is_nan($times[5]) || $this->timeDiff($times[4], $times[5]) > $MaghribDiff)
-            $times[5] = $times[4] + $MaghribDiff;
-        return $times;
-    }
-
-    function nightPortion($angle)
-    {
-        if ($this->adjustHighLats == $this->AngleBased) return 1 / 60 * $angle;
-        if ($this->adjustHighLats == $this->MidNight)   return 1 / 2;
-        if ($this->adjustHighLats == $this->OneSeventh) return 1 / 7;
-        return 0;
-    }
-
-    function dayPortion($times)
-    {
-        for ($i = 0; $i < 7; $i++) $times[$i] /= 24;
-        return $times;
-    }
-
-    function timeDiff($t1, $t2) { return $this->fixhour($t2 - $t1); }
-
-    function twoDigitsFormat($n) { return ($n < 10) ? '0' . $n : $n; }
-
-    function julianDate($year, $month, $day)
-    {
-        if ($month <= 2) { $year -= 1; $month += 12; }
-        $A  = floor($year / 100);
-        $B  = 2 - $A + floor($A / 4);
+        if ($month <= 2) { $year--; $month += 12; }
+        $A = floor($year / 100);
+        $B = 2 - $A + floor($A / 4);
         return floor(365.25 * ($year + 4716)) + floor(30.6001 * ($month + 1)) + $day + $B - 1524.5;
     }
 
-    function dsin($d)  { return sin($this->dtr($d)); }
-    function dcos($d)  { return cos($this->dtr($d)); }
-    function dtan($d)  { return tan($this->dtr($d)); }
-    function darcsin($x) { return $this->rtd(asin($x)); }
-    function darccos($x) { return $this->rtd(acos($x)); }
-    function darctan($x) { return $this->rtd(atan($x)); }
-    function darctan2($y,$x) { return $this->rtd(atan2($y, $x)); }
-    function darccot($x) { return $this->rtd(atan(1 / $x)); }
-    function dtr($d)   { return ($d * M_PI) / 180.0; }
-    function rtd($r)   { return ($r * 180.0) / M_PI; }
+    // ── Helpers ──────────────────────────────────────────────────────
 
-    function fixangle($a)
+    private function dayPortion($times)
+    {
+        foreach ($times as $k => &$v) { $v /= 24; }
+        unset($v);
+        return $times;
+    }
+
+    private function timeDiff($t1, $t2)
+    {
+        return $this->fixHour($t2 - $t1);
+    }
+
+    private function evalParam($str)
+    {
+        return floatval(preg_replace('/[^0-9.+\-]/', '', (string)$str));
+    }
+
+    private function isMin($arg)
+    {
+        return strpos((string)$arg, 'min') !== false;
+    }
+
+    // ── Trig (degree-based) ──────────────────────────────────────────
+
+    private function dtr($d) { return ($d * M_PI) / 180.0; }
+    private function rtd($r) { return ($r * 180.0) / M_PI; }
+    private function dsin($d)  { return sin($this->dtr($d)); }
+    private function dcos($d)  { return cos($this->dtr($d)); }
+    private function dtan($d)  { return tan($this->dtr($d)); }
+    private function darcsin($x) { return $this->rtd(asin($x)); }
+    private function darccos($x) { return $this->rtd(acos($x)); }
+    private function darctan2($y, $x) { return $this->rtd(atan2($y, $x)); }
+    private function darccot($x)  { return $this->rtd(atan(1.0 / $x)); }
+
+    private function fixAngle($a)
     {
         $a = $a - 360.0 * floor($a / 360.0);
         return $a < 0 ? $a + 360.0 : $a;
     }
 
-    function fixhour($a)
+    private function fixHour($a)
     {
         $a = $a - 24.0 * floor($a / 24.0);
         return $a < 0 ? $a + 24.0 : $a;
     }
 }
 // =====================================================================
-//  END PrayTime class
+//  END PrayTimes class
 // =====================================================================
 
 
@@ -340,10 +422,10 @@ function ical_fold(string $line): string
     $result = '';
     $col    = 0;
     foreach ($chars as $ch) {
-        $bytes = strlen($ch); // UTF-8 byte width
+        $bytes = strlen($ch);
         if ($col + $bytes > 75) {
             $result .= "\r\n ";
-            $col = 1; // space continuation
+            $col = 1;
         }
         $result .= $ch;
         $col += $bytes;
@@ -367,15 +449,34 @@ function ical_escape(string $s): string
 // =====================================================================
 $lat          = get_float('lat');
 $lng          = get_float('lng');
-$method       = get_int('method',       3, 0, 7);
-$asr          = get_int('asr',          0, 0, 1);
+$elv          = get_float('elv', 0.0);
 $before_raw   = get_int('before',       0, 0, 180);
 $after_raw    = get_int('after',       30, 0, 180);
-$hours_before = get_int('hours_before', 0, 0, 8760);   // max 1 year back
-$hours_after  = get_int('hours_after', 720, 1, 17520); // max 2 years forward
+$hours_before = get_int('hours_before', 0, 0, 8760);
+$hours_after  = get_int('hours_after', 720, 1, 17520);
 $tz_raw       = get_str('tz', 'UTC', 64);
 $prayers_raw  = get_str('prayers', 'fajr,dhuhr,asr,maghrib,isha', 100);
 $location_raw = get_str('location', '', 100);
+
+// Method: accept string keys or legacy integer IDs
+$method_raw = get_str('method', 'MWL', 64);
+$legacy_method_map = [
+    '0' => 'Tehran', '1' => 'Karachi', '2' => 'ISNA', '3' => 'MWL',
+    '4' => 'Makkah', '5' => 'Egypt',   '6' => 'MWL',  '7' => 'Tehran',
+];
+$method = $legacy_method_map[$method_raw] ?? $method_raw;
+$all_methods = PrayTimes::getAllMethods();
+if (!isset($all_methods[$method])) {
+    $method = 'MWL';
+}
+
+// ASR: accept Standard/Hanafi or legacy 0/1
+$asr_raw = get_str('asr', 'Standard', 20);
+$legacy_asr_map = ['0' => 'Standard', '1' => 'Hanafi'];
+$asr = $legacy_asr_map[$asr_raw] ?? $asr_raw;
+if (!in_array($asr, ['Standard', 'Hanafi'])) {
+    $asr = 'Standard';
+}
 
 // Round before/after to nearest 5 min
 $before = (int)(round($before_raw / 5) * 5);
@@ -395,7 +496,7 @@ function abort(int $code, string $msg): void
 
 if ($lat === null || $lng === null) {
     abort(400, "Missing required parameters: 'lat' and 'lng'.\n"
-             . "Example: prayer.php?lat=51.5074&lng=-0.1278&method=3&tz=Europe%2FLondon");
+             . "Example: prayer.php?lat=51.5074&lng=-0.1278&method=MWL&tz=Europe%2FLondon");
 }
 if ($lat < -90 || $lat > 90)    abort(400, "Latitude must be between -90 and 90.");
 if ($lng < -180 || $lng > 180)  abort(400, "Longitude must be between -180 and 180.");
@@ -409,15 +510,17 @@ try {
     $tz_clean = 'UTC';
 }
 
-// Prayer index map
+// Prayer index map (string keys matching PrayTimes output)
 $prayers_map = [
-    'fajr'    => ['idx' => 0, 'en' => 'Fajr',    'ar' => 'الفجر'],
-    'sunrise' => ['idx' => 1, 'en' => 'Sunrise',  'ar' => 'الشروق'],
-    'dhuhr'   => ['idx' => 2, 'en' => 'Dhuhr',    'ar' => 'الظهر'],
-    'asr'     => ['idx' => 3, 'en' => 'Asr',      'ar' => 'العصر'],
-    'sunset'  => ['idx' => 4, 'en' => 'Sunset',   'ar' => 'الغروب'],
-    'maghrib' => ['idx' => 5, 'en' => 'Maghrib',  'ar' => 'المغرب'],
-    'isha'    => ['idx' => 6, 'en' => 'Isha',     'ar' => 'العشاء'],
+    'imsak'   => ['key' => 'imsak',    'en' => 'Imsak',    'ar' => 'الإمساك'],
+    'fajr'    => ['key' => 'fajr',     'en' => 'Fajr',     'ar' => 'الفجر'],
+    'sunrise' => ['key' => 'sunrise',  'en' => 'Sunrise',  'ar' => 'الشروق'],
+    'dhuhr'   => ['key' => 'dhuhr',    'en' => 'Dhuhr',    'ar' => 'الظهر'],
+    'asr'     => ['key' => 'asr',      'en' => 'Asr',      'ar' => 'العصر'],
+    'sunset'  => ['key' => 'sunset',   'en' => 'Sunset',   'ar' => 'الغروب'],
+    'maghrib' => ['key' => 'maghrib',  'en' => 'Maghrib',  'ar' => 'المغرب'],
+    'isha'    => ['key' => 'isha',     'en' => 'Isha',     'ar' => 'العشاء'],
+    'midnight'=> ['key' => 'midnight', 'en' => 'Midnight', 'ar' => 'منتصف الليل'],
 ];
 
 $selected_keys = array_values(array_filter(
@@ -435,18 +538,13 @@ $now         = new DateTime('now', $timezone);
 $range_start = (clone $now)->modify("-{$hours_before} hours");
 $range_end   = (clone $now)->modify("+{$hours_after} hours");
 
-// Loop from the calendar day of range_start through range_end
 $loop_date = new DateTime($range_start->format('Y-m-d') . ' 00:00:00', $timezone);
 $loop_end  = new DateTime($range_end->format('Y-m-d')   . ' 00:00:00', $timezone);
 
 // =====================================================================
 //  Build iCal
 // =====================================================================
-$method_names = [
-    0 => 'Jafari', 1 => 'Karachi', 2 => 'ISNA', 3 => 'MWL',
-    4 => 'Makkah', 5 => 'Egypt',   6 => 'Custom', 7 => 'Tehran',
-];
-$method_label = $method_names[$method] ?? "Method {$method}";
+$method_label = $all_methods[$method]['name'] ?? $method;
 $location_label = $location_raw ?: "{$lat}, {$lng}";
 
 $cal_name = "Prayer Times · {$method_label}";
@@ -454,7 +552,7 @@ $cal_desc = "Prayer times for {$location_label} | Method: {$method_label} | Time
 
 $ical  = "BEGIN:VCALENDAR\r\n";
 $ical .= "VERSION:2.0\r\n";
-$ical .= ical_fold("PRODID:-//Hablullah//Prayer Times Calendar 1.0//EN");
+$ical .= ical_fold("PRODID:-//SalahCalendar//Prayer Times Calendar 2.3//EN");
 $ical .= "CALSCALE:GREGORIAN\r\n";
 $ical .= "METHOD:PUBLISH\r\n";
 $ical .= ical_fold("X-WR-CALNAME:" . ical_escape($cal_name));
@@ -462,9 +560,8 @@ $ical .= ical_fold("X-WR-CALDESC:" . ical_escape($cal_desc));
 $ical .= "REFRESH-INTERVAL;VALUE=DURATION:PT12H\r\n";
 $ical .= "X-PUBLISHED-TTL:PT12H\r\n";
 
-$prayTime = new PrayTime($method);
-$prayTime->setAsrMethod($asr);
-$prayTime->setTimeFormat(3); // Float output
+$prayTime = new PrayTimes($method);
+$prayTime->adjust(['asr' => $asr]);
 
 $utc = new DateTimeZone('UTC');
 
@@ -476,11 +573,11 @@ while ($loop_date <= $loop_end) {
     // Timezone offset for this specific day (seconds → hours), respects DST
     $tz_offset_hours = $timezone->getOffset($loop_date) / 3600;
 
-    $times = $prayTime->getDatePrayerTimes($y, $m, $d, $lat, $lng, $tz_offset_hours);
+    $times = $prayTime->getTimes($y, $m, $d, $lat, $lng, $tz_offset_hours, $elv);
 
     foreach ($selected_keys as $key) {
         $p          = $prayers_map[$key];
-        $float_time = $times[$p['idx']];
+        $float_time = $times[$p['key']];
 
         if (!is_numeric($float_time) || is_nan((float)$float_time)) continue;
 
@@ -499,7 +596,7 @@ while ($loop_date <= $loop_end) {
         $ev_end = clone $adhan;
         $ev_end->modify("+{$after} minutes");
 
-        // Capture local adhan string before converting timezone
+        // Capture local adhan string
         $adhan_local = $adhan->format('H:i');
 
         // Convert to UTC for iCal timestamps
@@ -509,9 +606,9 @@ while ($loop_date <= $loop_end) {
         $dtstart = $ev_start_utc->format('Ymd\THis\Z');
         $dtend   = $ev_end_utc->format('Ymd\THis\Z');
 
-        // Unique UID — deterministic so re-importing doesn't duplicate
+        // Unique UID — deterministic
         $uid = md5("{$key}|{$loop_date->format('Ymd')}|{$lat}|{$lng}|{$method}")
-             . '@prayer.hablullah.app';
+             . '@salahcalendar.app';
 
         $summary = "{$p['en']} ({$p['ar']}) · {$adhan_local}";
 
