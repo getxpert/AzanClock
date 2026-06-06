@@ -443,7 +443,7 @@ export default function MainDial({
             if (dim === 1) ctx.globalAlpha = 1
         }
 
-        sac.updateTitle(ctx, 'AzanClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)
+        sac.updateTitle(ctx, 'SalahClock • ' + currentVakit.name + ' • Next: ' + nextVakit.name + ' @ ' + nextVakit.time + ' in ' + nextText + ' • ' + locationSettings.address)
 
         if (showAnalogue)
             sac.drawAnalogueClock(ctx);

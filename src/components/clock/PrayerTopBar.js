@@ -68,17 +68,7 @@ export default function PrayerTopBar({ vakits, currentVakit, nextVakit, time, TO
                         overflow: 'hidden',
                         gap: isPortrait ? 1 : 10,
                     }}>
-                        {/* Arabic name — top line in portrait */}
-                        <span style={{
-                            fontSize: prayerFont,
-                            direction: 'rtl',
-                            whiteSpace: 'nowrap',
-                            color: 'white',
-                            lineHeight: 1.1,
-                        }}>
-                            {arabicPrayerNames[v.name] || v.name}
-                        </span>
-                        {/* Time — bottom line in portrait */}
+                        {/* Time — left in landscape/desktop, top line in portrait */}
                         <span style={{
                             display: 'inline-flex', alignItems: 'baseline',
                             gap: 2, direction: 'ltr', whiteSpace: 'nowrap',
@@ -103,6 +93,16 @@ export default function PrayerTopBar({ vakits, currentVakit, nextVakit, time, TO
                                     {parseInt(v.time.split(':')[0], 10) < 12 ? 'AM' : 'PM'}
                                 </span>
                             )}
+                        </span>
+                        {/* Arabic name — right in landscape/desktop, bottom line in portrait */}
+                        <span style={{
+                            fontSize: prayerFont,
+                            direction: 'rtl',
+                            whiteSpace: 'nowrap',
+                            color: 'white',
+                            lineHeight: 1.1,
+                        }}>
+                            {arabicPrayerNames[v.name] || v.name}
                         </span>
                     </div>
                 )

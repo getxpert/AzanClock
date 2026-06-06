@@ -89,17 +89,27 @@ export default function Clock() {
     const [eventsData, setEventsData] = useState({ active: [], upcoming: [] })
     const notifiedRef = useRef(new Set())
     const notifAudioRef = useRef(null)
+    // Keep refs so the stable interval always sees the latest values
+    const isAudioPlayingRef = useRef(isAudioPlaying)
+    const prayerTimesRef = useRef(prayerTimes)
+    useEffect(() => { isAudioPlayingRef.current = isAudioPlaying }, [isAudioPlaying])
+    useEffect(() => { prayerTimesRef.current = prayerTimes }, [prayerTimes])
+
     useEffect(() => {
         const notifSrc = Audios.find(a => a.id === 101)?.source
 
-        const tick = async () => {
+        // Load events immediately on mount
+        EventsService.getActiveAndUpcoming(new Date(), 5, prayerTimesRef.current).then(setEventsData)
+
+        const intervalId = setInterval(async () => {
             if (new Date().getSeconds() !== 0) return
 
-            const data = await EventsService.getActiveAndUpcoming(new Date(), 5, prayerTimes)
+            const now = new Date()
+            const data = await EventsService.getActiveAndUpcoming(now, 5, prayerTimesRef.current)
             setEventsData(data)
 
-            if (!isAudioPlaying && notifSrc) {
-                const due = await EventsService.getNotificationsDue(new Date(), prayerTimes)
+            if (!isAudioPlayingRef.current && notifSrc) {
+                const due = await EventsService.getNotificationsDue(now, prayerTimesRef.current)
                 for (const ev of due) {
                     const key = `${ev.id}-${ev.nextOccurrence.toISOString()}`
                     if (notifiedRef.current.has(key)) continue
@@ -116,13 +126,10 @@ export default function Clock() {
                     break
                 }
             }
-        }
-
-        EventsService.getActiveAndUpcoming(new Date(), 5, prayerTimes).then(setEventsData)
-
-        const id = setInterval(tick, 1000)
-        return () => clearInterval(id)
-    }, [isAudioPlaying])
+        }, 1000)
+        return () => clearInterval(intervalId)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []) // stable interval — refs keep values current without re-registering
 
     // ── Drag handlers ─────────────────────────────────────────────────────────
     const handlePointerDown = (e) => {
@@ -409,12 +416,12 @@ export default function Clock() {
             <div className='d-flex flex-row h-100 align-items-center justify-content-center'
                 style={{
                     overflow: 'hidden',
-                    paddingTop: isPortrait ? TOP_BAR + 80 : TOP_BAR,
+                    paddingTop: TOP_BAR,
                     paddingBottom: BOTTOM_BAR,
                     paddingLeft: SIDE_TOTAL_L,
                     paddingRight: SIDE_TOTAL_R,
                     justifyContent: isPortrait ? 'center' : 'flex-start',
-                    alignItems: isPortrait ? 'flex-start' : 'center',
+                    alignItems: 'center',
                 }}>
                 <div ref={driftRef}>
                     <div ref={dragWrapperRef}

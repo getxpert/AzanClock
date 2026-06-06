@@ -23,6 +23,10 @@ export default function WeatherDisplay({ weatherData, currentVakit, currentHijri
     const afterSunset = currentVakit &&
         (currentVakit.name === 'Maghrib' || currentVakit.name === 'Isha' || currentVakit.name === 'Imsak')
 
+    // Weather call failed when we have data but success === false (stale/fallback)
+    // or when we have no data at all and a location is configured
+    const weatherFailed = weatherData?.success === false || (!weatherData && !!locationSettings?.address)
+
     const weatherIcon = weatherData ? (() => {
         const code = weatherData.weatherCode;
         if (code === 0) return '☀️';
@@ -46,10 +50,10 @@ export default function WeatherDisplay({ weatherData, currentVakit, currentHijri
     if (clockStyle === 'D')
         return null;
 
-    // Show component if: moon phase after sunset OR weather data available OR location available
+    // Show component if: moon phase after sunset OR weather failed (show moon as fallback) OR weather data available OR location available
     const hasLocation = locationSettings?.address
-    const showMoon = afterSunset
-    const showWeather = weatherData && weatherIcon
+    const showMoon = afterSunset || weatherFailed
+    const showWeather = weatherData && weatherIcon && !weatherFailed
     
     if (!showMoon && !showWeather && !hasLocation) return null
 
@@ -77,7 +81,7 @@ export default function WeatherDisplay({ weatherData, currentVakit, currentHijri
             {/* Icon + temperature on one row */}
             {(showMoon || showWeather) && (
                 <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.4em' }}>
-                    {afterSunset ? (
+                    {showMoon ? (
                         <img
                             src={`/moon/${currentHijriDay}.png`}
                             alt={`Moon day ${currentHijriDay}`}

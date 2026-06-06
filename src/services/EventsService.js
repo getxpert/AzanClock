@@ -150,9 +150,19 @@ const loadHijriEvents = async () => {
  * representation until we find the match.  This is fast in practice because
  * Islamic months are only 29–30 days and the window is small.
  *
+ * Results are cached permanently — the Hijri↔Gregorian mapping never changes,
+ * so we only pay the search cost once per unique date for the lifetime of the page.
+ *
  * Returns a Date at midnight local time, or null if not found.
  */
+const _hijriToGregorianCache = new Map()
+
 const hijriToGregorian = (hijriDay, hijriMonth, hijriYear) => {
+    const cacheKey = `${hijriYear}/${hijriMonth}/${hijriDay}`
+    if (_hijriToGregorianCache.has(cacheKey)) {
+        return _hijriToGregorianCache.get(cacheKey)
+    }
+
     // Rough Gregorian year estimate
     const estGregorianYear = Math.round(hijriYear * 0.9702 + 621.5)
 
@@ -174,11 +184,14 @@ const hijriToGregorian = (hijriDay, hijriMonth, hijriYear) => {
                 const hy = parseInt(parts.find(p => p.type === 'year')?.value || '0', 10)
 
                 if (hd === hijriDay && hm === hijriMonth && hy === hijriYear) {
-                    return new Date(gy, gm, gd)
+                    const result = new Date(gy, gm, gd)
+                    _hijriToGregorianCache.set(cacheKey, result)
+                    return result
                 }
             }
         }
     }
+    _hijriToGregorianCache.set(cacheKey, null)
     return null
 }
 

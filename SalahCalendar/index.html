@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prayer Times Calendar — حبل الله Hablullah</title>
+<meta name="description" content="Generate a subscribable prayer times calendar for Outlook, Apple Calendar and Google Calendar.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ── Tokens ─────────────────────────────────────────────────────── */
+:root {
+  --bg:        #080D14;
+  --surf:      #0F1824;
+  --surf2:     #162030;
+  --border:    #1E2D3F;
+  --gold:      #C9962D;
+  --goldlt:    #E8B84B;
+  --golddim:   rgba(201,150,45,.18);
+  --goldglow:  rgba(201,150,45,.07);
+  --teal:      #2E8B72;
+  --tealdim:   rgba(46,139,114,.15);
+  --tealtext:  #5DCBB0;
+  --text:      #E2D8CC;
+  --muted:     #7A8FA5;
+  --danger:    #D95A4A;
+  --r:         10px;
+  --rlg:       14px;
+  --font:      'DM Sans', sans-serif;
+  --ar:        'Amiri', serif;
+  --hdr:       52px;
+  --sb:        360px;      /* sidebar width */
+}
+@media (min-width:1400px) { :root { --sb: 420px; } }
+@media (max-width:1100px) { :root { --sb: 310px; } }
+
+/* ── Reset ──────────────────────────────────────────────────────── */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body { font-family:var(--font); font-size:15px; background:var(--bg); color:var(--text); }
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr {
+  height: var(--hdr);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1.25rem;
+  background: linear-gradient(90deg,#0A1422 0%,#0d1a2a 100%);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 900;
+}
+.brand { display:flex; align-items:baseline; gap:.55rem; }
+.brand-ar { font-family:var(--ar); font-size:1.3rem; color:var(--gold); }
+.brand-en { font-size:.7rem; color:var(--muted); font-weight:300; letter-spacing:.12em; text-transform:uppercase; }
+.hdr-sep  { flex:1; }
+.hdr-tag  { font-size:.7rem; color:var(--muted); letter-spacing:.1em; text-transform:uppercase;
+            border:1px solid var(--border); padding:.28rem .75rem; border-radius:100px; }
+
+/* ── App layout ─────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: var(--sb) 1fr;
+  height: calc(100vh - var(--hdr));
+  overflow: hidden;
+}
+
+/* ── Left sidebar ───────────────────────────────────────────────── */
+.sb {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.sb-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(201,150,45,.25) transparent;
+}
+.sb-scroll::-webkit-scrollbar { width:4px; }
+.sb-scroll::-webkit-scrollbar-thumb { background:rgba(201,150,45,.22); border-radius:2px; }
+
+/* Section */
+.sect { border-bottom:1px solid var(--border); }
+.sect-btn {
+  width:100%; display:flex; align-items:center; gap:.6rem;
+  padding:.85rem 1.1rem; background:none; border:none; cursor:pointer;
+  color:var(--text); font-family:var(--font); font-size:.88rem;
+  text-align:left; transition:background .15s;
+}
+.sect-btn:hover { background:rgba(255,255,255,.03); }
+.sect-num {
+  width:22px; height:22px; border-radius:50%;
+  background:var(--golddim); border:1px solid var(--gold);
+  color:var(--gold); font-size:.7rem; font-weight:600;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.sect-name { font-weight:500; flex:1; }
+.sect-meta { font-size:.72rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+.sect-chev { color:var(--muted); font-size:.75rem; margin-left:.25rem; transition:transform .2s; }
+.sect-chev.open { transform:rotate(180deg); }
+
+.sect-body { padding:.15rem 1.1rem 1rem; }
+.sect-body.collapsed { display:none; }
+
+/* ── Form elements ──────────────────────────────────────────────── */
+.field  { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.85rem; }
+.field:last-child { margin-bottom:0; }
+.lbl   { font-size:.76rem; color:var(--muted); font-weight:500; letter-spacing:.02em; }
+.hint  { font-size:.7rem; color:var(--muted); opacity:.7; margin-top:.1rem; }
+
+.inp {
+  width:100%; background:var(--surf2); border:1px solid var(--border);
+  border-radius:var(--r); color:var(--text); font-family:var(--font);
+  font-size:.85rem; padding:.58rem .85rem;
+  transition:border-color .2s, box-shadow .2s; outline:none;
+  -webkit-appearance:none;
+}
+.inp:focus { border-color:var(--gold); box-shadow:0 0 0 3px var(--golddim); }
+.inp::placeholder { color:var(--muted); }
+.inp.has-icon { padding-left:2.3rem; }
+select.inp {
+  cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%237A8FA5' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right .8rem center;
+  padding-right:2.2rem;
+}
+
+.search-wrap { position:relative; }
+.search-ic { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); color:var(--muted); font-size:.9rem; pointer-events:none; }
+
+.ac-list { position:absolute; top:calc(100% + 4px); left:0; right:0;
+           background:#182435; border:1px solid var(--border); border-radius:var(--r);
+           z-index:2000; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,.55); }
+.ac-list.hidden { display:none; }
+.ac-item { padding:.55rem .85rem; font-size:.81rem; cursor:pointer;
+           border-bottom:1px solid var(--border); transition:background .1s; }
+.ac-item:last-child { border-bottom:none; }
+.ac-item:hover { background:var(--surf2); color:var(--gold); }
+.ac-name { font-weight:500; }
+.ac-sub  { font-size:.72rem; color:var(--muted); }
+
+/* Geo row */
+.geo-row { display:flex; gap:.5rem; align-items:stretch; margin-top:.65rem; }
+.geo-row .search-wrap { flex:1; }
+.btn-geo { flex-shrink:0; background:var(--surf2); border:1px solid var(--border);
+           color:var(--muted); border-radius:var(--r); padding:.58rem .85rem;
+           font-family:var(--font); font-size:.8rem; cursor:pointer; transition:all .15s;
+           white-space:nowrap; }
+.btn-geo:hover { border-color:var(--gold); color:var(--gold); }
+
+/* Coord */
+.coord-wrap { display:none; margin-top:.75rem; padding:.6rem .8rem;
+              background:var(--tealdim); border:1px solid rgba(46,139,114,.28);
+              border-radius:var(--r); gap:.5rem; flex-wrap:wrap; align-items:center; }
+.coord-wrap.show { display:flex; }
+.c-pill { font-family:monospace; font-size:.78rem; color:var(--tealtext); }
+.c-name { font-size:.78rem; color:var(--muted); }
+
+/* Prayer checkboxes */
+.prayer-grid { display:grid; grid-template-columns:1fr 1fr; gap:.35rem .5rem; margin-top:.3rem; }
+.p-check { display:flex; align-items:center; gap:.35rem; }
+.p-check input { accent-color:var(--gold); width:14px; height:14px; cursor:pointer; flex-shrink:0; }
+.p-check label { cursor:pointer; font-size:.82rem; display:flex; align-items:baseline; gap:.25rem; }
+.p-check .ar { font-family:var(--ar); font-size:.9rem; color:var(--muted); }
+
+/* Sliders */
+.slider-row { display:flex; align-items:center; gap:.65rem; }
+.slider-row input[type=range] {
+  flex:1; -webkit-appearance:none; height:4px; background:var(--border);
+  border-radius:2px; outline:none; cursor:pointer;
+}
+.slider-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:16px; height:16px;
+  background:var(--gold); border-radius:50%;
+}
+.slider-row input[type=range]::-moz-range-thumb {
+  width:16px; height:16px; background:var(--gold); border-radius:50%; border:none;
+}
+.sv { min-width:50px; text-align:right; font-size:.82rem; color:var(--gold); font-weight:500; }
+
+/* Days row */
+.days-row { display:grid; grid-template-columns:1fr 1fr; gap:.65rem; }
+
+/* ── Sidebar footer (action buttons) ───────────────────────────── */
+.sb-foot {
+  flex-shrink:0; padding:.85rem 1.1rem;
+  border-top:1px solid var(--border);
+  background:var(--surf);
+}
+.act-row { display:flex; gap:.55rem; }
+.btn-prev {
+  flex:1; background:var(--surf2); border:1.5px solid rgba(201,150,45,.38);
+  color:var(--gold); border-radius:var(--r); padding:.62rem .5rem;
+  font-family:var(--font); font-size:.84rem; font-weight:500;
+  cursor:pointer; transition:all .15s;
+}
+.btn-prev:hover { background:var(--golddim); border-color:var(--gold); }
+.btn-gen {
+  flex:2; background:linear-gradient(135deg,var(--gold) 0%,#A67820 100%);
+  color:#070C12; font-size:.88rem; font-weight:700;
+  padding:.62rem .5rem; border-radius:var(--r); border:none;
+  cursor:pointer; font-family:var(--font);
+  box-shadow:0 3px 14px rgba(201,150,45,.22);
+  transition:opacity .15s, transform .1s;
+}
+.btn-gen:hover   { opacity:.9; transform:translateY(-1px); }
+.btn-gen:active  { transform:translateY(0); }
+.btn-gen:disabled{ opacity:.38; cursor:not-allowed; transform:none; box-shadow:none; }
+.err-msg { font-size:.78rem; color:var(--danger); padding:.3rem 0 0; display:none; }
+
+/* ── Right main column ──────────────────────────────────────────── */
+.main {
+  display:flex; flex-direction:column;
+  overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(201,150,45,.2) transparent;
+}
+.main::-webkit-scrollbar { width:5px; }
+.main::-webkit-scrollbar-thumb { background:rgba(201,150,45,.18); border-radius:3px; }
+
+/* Map */
+.map-wrap { flex-shrink:0; position:relative; }
+#map {
+  width:100%;
+  height: clamp(320px, calc(100vh - var(--hdr) - 3rem), 580px);
+}
+.map-tip {
+  position:absolute; bottom:.6rem; left:50%; transform:translateX(-50%);
+  background:rgba(8,13,20,.82); border:1px solid var(--border);
+  color:var(--muted); font-size:.72rem; padding:.22rem .65rem;
+  border-radius:100px; pointer-events:none; white-space:nowrap;
+  backdrop-filter:blur(4px);
+}
+
+/* ── Preview panel ───────────────────────────────────────────────── */
+.prev-panel { display:none; border-top:1px solid var(--border); }
+.prev-panel.show { display:block; }
+
+.prev-topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.65rem 1rem; background:var(--surf2);
+  border-bottom:1px solid var(--border); flex-wrap:wrap; gap:.5rem;
+}
+.prev-title { font-size:.75rem; font-weight:600; text-transform:uppercase;
+              letter-spacing:.07em; color:var(--muted); }
+.prev-nav   { display:flex; align-items:center; gap:.5rem; }
+.prev-period { font-size:.84rem; color:var(--text); font-weight:500;
+               min-width:190px; text-align:center; }
+.nav-btn {
+  background:none; border:1px solid var(--border); color:var(--muted);
+  border-radius:6px; padding:.22rem .6rem; cursor:pointer;
+  font-family:var(--font); font-size:.78rem; transition:all .15s;
+}
+.nav-btn:hover { border-color:var(--gold); color:var(--gold); }
+.tz-bar { font-size:.72rem; color:var(--muted); padding:.35rem 1rem;
+          background:rgba(0,0,0,.25); border-bottom:1px solid var(--border); }
+.tz-bar span { color:var(--tealtext); font-weight:500; }
+
+/* 7-day grid */
+.prev-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+.prev-empty { grid-column:1/-1; display:flex; align-items:center; justify-content:center;
+              padding:2.5rem; color:var(--muted); font-size:.88rem; }
+
+.p-day { border-right:1px solid var(--border); padding:.65rem .55rem; min-width:0; }
+.p-day:last-child { border-right:none; }
+.p-day.today { background:var(--goldglow); border-top:2px solid var(--gold); }
+
+.day-hdr { margin-bottom:.5rem; }
+.day-wd  { font-size:.65rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
+.day-d   { font-size:1.1rem; font-weight:300; color:var(--text); line-height:1.2; }
+.today-tag { display:inline-block; font-size:.58rem; font-weight:700; text-transform:uppercase;
+             background:var(--golddim); color:var(--gold); border-radius:3px;
+             padding:.06rem .38rem; margin-top:.18rem; letter-spacing:.06em; }
+
+.pr-row   { padding:.25rem 0; border-top:1px solid rgba(255,255,255,.04); }
+.pr-names { display:flex; align-items:baseline; gap:.28rem; }
+.pr-en    { font-size:.7rem; font-weight:500; color:var(--text); }
+.pr-ar    { font-family:var(--ar); font-size:.82rem; color:var(--muted); }
+.pr-time  { font-family:monospace; font-size:.9rem; font-weight:600;
+            color:var(--gold); letter-spacing:.02em; display:block; }
+.pr-win   { font-family:monospace; font-size:.63rem; color:var(--muted); display:block; }
+
+/* ── URL section ─────────────────────────────────────────────────── */
+.url-sect { display:none; padding:1.25rem; border-top:1px solid var(--border); }
+.url-sect.show { display:block; }
+.url-card { background:var(--surf2); border:1px solid var(--border); border-radius:var(--r);
+            padding:.9rem; margin-bottom:.75rem; }
+.url-lbl  { font-size:.7rem; color:var(--muted); text-transform:uppercase;
+            letter-spacing:.09em; margin-bottom:.45rem;
+            display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; }
+.url-txt  { font-family:monospace; font-size:.75rem; color:var(--goldlt);
+            word-break:break-all; line-height:1.55;
+            background:rgba(0,0,0,.25); border-radius:6px;
+            padding:.45rem .65rem; margin-bottom:.6rem; }
+.url-acts { display:flex; gap:.45rem; flex-wrap:wrap; align-items:center; }
+.cpfb { font-size:.75rem; color:var(--tealtext); opacity:0; transition:opacity .3s; }
+.cpfb.show { opacity:1; }
+.badge { display:inline-block; font-size:.66rem; font-weight:600; padding:.12rem .42rem;
+         border-radius:4px; letter-spacing:.04em; text-transform:uppercase; vertical-align:middle; }
+.b-ol { background:rgba(0,114,198,.16); color:#5EB4FF; border:1px solid rgba(0,114,198,.28); }
+.b-ap { background:rgba(80,200,120,.12); color:#5DC880; border:1px solid rgba(80,200,120,.25); }
+.b-gc { background:rgba(234,67,53,.12);  color:#F07B74; border:1px solid rgba(234,67,53,.25); }
+
+.btn { display:inline-flex; align-items:center; gap:.4rem; padding:.52rem .9rem;
+       border-radius:var(--r); font-family:var(--font); font-size:.82rem; font-weight:500;
+       cursor:pointer; border:none; transition:all .15s; white-space:nowrap; text-decoration:none; }
+.btn-ghost { background:var(--surf2); border:1px solid var(--border); color:var(--muted); }
+.btn-ghost:hover { border-color:var(--gold); color:var(--gold); }
+.btn-prim  { background:var(--gold); color:#070C12; font-weight:600; }
+.btn-prim:hover { background:var(--goldlt); }
+
+.how-to { margin-top:1rem; font-size:.8rem; color:var(--muted); line-height:1.8; }
+.how-to strong { color:var(--text); }
+.how-to ol { padding-left:1.15rem; }
+.how-to li { margin-bottom:.3rem; }
+
+/* ── Leaflet overrides ───────────────────────────────────────────── */
+.leaflet-control-zoom a { background:var(--surf2)!important; color:var(--text)!important; border-color:var(--border)!important; }
+.leaflet-control-attribution { background:rgba(8,13,20,.75)!important; color:var(--muted)!important; font-size:10px!important; }
+.leaflet-control-attribution a { color:var(--muted)!important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════ */
+
+/* ── Tablet 768-1099px ────────────────────────────────────────── */
+@media (max-width:1099px) and (min-width:769px) {
+  .prev-grid { grid-template-columns:repeat(7,minmax(80px,1fr)); overflow-x:auto; }
+}
+
+/* ── Mobile landscape  (≤768px wide, landscape orientation) ──── */
+@media (max-width:768px) and (orientation:landscape) {
+  :root { --sb:260px; --hdr:44px; }
+  .app { height:calc(100vh - var(--hdr)); }
+  #map { height:calc(100vh - var(--hdr)); }
+  .map-tip { display:none; }
+  .prev-grid { grid-template-columns:repeat(7,minmax(72px,1fr)); overflow-x:auto; }
+  /* Compact section padding */
+  .sect-btn  { padding:.65rem 1rem; }
+  .sect-body { padding:.1rem .9rem .8rem; }
+  .sb-foot   { padding:.7rem 1rem; }
+}
+
+/* ── Mobile portrait (≤768px, portrait) ──────────────────────── */
+@media (max-width:768px) and (orientation:portrait), (max-width:500px) {
+  :root { --hdr:48px; }
+
+  /* Switch to single column with map on top */
+  .app {
+    display:flex;
+    flex-direction:column;
+    height:auto;
+    overflow:visible;
+  }
+
+  /* Right col (map + output) comes FIRST on mobile */
+  .main { order:1; overflow:visible; }
+  .sb   { order:2; overflow:visible; border-right:none; border-top:1px solid var(--border); }
+
+  /* Map sizing */
+  #map { height:58vw; min-height:220px; max-height:380px; }
+
+  /* Sections start collapsed */
+  .sect-body.collapsed { display:none!important; }
+  .sect-body { padding:.1rem 1rem .9rem; }
+
+  /* 7-day preview becomes scrollable on small screens */
+  .prev-grid { grid-template-columns:repeat(7,minmax(80px,1fr)); overflow-x:auto; }
+
+  /* Compact actions */
+  .sb-foot { position:sticky; bottom:0; z-index:100; }
+  .btn-prev, .btn-gen { padding:.62rem .65rem; font-size:.82rem; }
+}
+
+/* Very narrow phones */
+@media (max-width:380px) {
+  .brand-ar { font-size:1.1rem; }
+  .prev-grid { grid-template-columns:repeat(7,minmax(70px,1fr)); }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="brand">
+    <span class="brand-ar">حبل الله</span>
+    <span class="brand-en">Hablullah</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <span class="hdr-tag">Prayer Times Calendar</span>
+</header>
+
+<!-- ── App layout ───────────────────────────────────────────────── -->
+<div class="app">
+
+  <!-- ══ LEFT SIDEBAR ══════════════════════════════════════════════ -->
+  <aside class="sb">
+    <div class="sb-scroll">
+
+      <!-- § Location -->
+      <div class="sect" id="sect-loc">
+        <button class="sect-btn" onclick="toggleSect('loc')">
+          <span class="sect-num">1</span>
+          <span class="sect-name">Location</span>
+          <span class="sect-meta" id="meta-loc">Not set</span>
+          <span class="sect-chev open" id="chev-loc">▾</span>
+        </button>
+        <div class="sect-body" id="body-loc">
+          <div class="geo-row">
+            <div class="search-wrap">
+              <span class="search-ic">⌕</span>
+              <input id="city-search" class="inp has-icon" type="search"
+                     placeholder="Search city or place…" autocomplete="off" spellcheck="false">
+              <div class="ac-list hidden" id="autocomplete"></div>
+            </div>
+            <button class="btn-geo" id="geo-btn" onclick="getMyLocation()">◎ My Location</button>
+          </div>
+          <div class="coord-wrap" id="coord-wrap">
+            <span class="c-pill" id="lat-pill">—</span>
+            <span class="c-pill" id="lng-pill">—</span>
+            <span class="c-name" id="loc-name"></span>
+          </div>
+          <p class="err-msg" id="geo-err" style="display:none"></p>
+        </div>
+      </div>
+
+      <!-- § Settings -->
+      <div class="sect" id="sect-set">
+        <button class="sect-btn" onclick="toggleSect('set')">
+          <span class="sect-num">2</span>
+          <span class="sect-name">Settings</span>
+          <span class="sect-meta" id="meta-set">MWL · 0 / 30 min</span>
+          <span class="sect-chev open" id="chev-set">▾</span>
+        </button>
+        <div class="sect-body" id="body-set">
+
+          <div class="field">
+            <label class="lbl" for="method">Calculation Method</label>
+            <select id="method" class="inp" onchange="onChg()">
+              <option value="3" selected>Muslim World League (MWL) — Fajr 18°, Isha 17°</option>
+              <option value="2">ISNA — Islamic Society of N. America — Fajr 15°, Isha 15°</option>
+              <option value="4">Umm al-Qura, Makkah — Fajr 18.5°, Isha 90 min after Maghrib</option>
+              <option value="5">Egyptian General Authority — Fajr 19.5°, Isha 17.5°</option>
+              <option value="1">Univ. of Islamic Sciences, Karachi — Fajr 18°, Isha 18°</option>
+              <option value="7">Institute of Geophysics, Tehran — Fajr 17.7°, Isha 14°</option>
+              <option value="0">Ithna Ashari (Jafari) — Fajr 16°, Maghrib 4°, Isha 14°</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="asr-m">Asr Juristic Method</label>
+            <select id="asr-m" class="inp" onchange="onChg()">
+              <option value="0" selected>Shafii / Standard (shadow factor 1)</option>
+              <option value="1">Hanafi (shadow factor 2)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="tz-in">Timezone</label>
+            <input id="tz-in" class="inp" type="text" placeholder="e.g. Europe/London" oninput="onChg()">
+            <span class="hint">IANA format — auto-detected from your browser</span>
+          </div>
+
+          <div class="field">
+            <label class="lbl">Prayers to Include</label>
+            <div class="prayer-grid">
+              <span class="p-check"><input type="checkbox" id="cb-fajr"    checked onchange="onChg()"><label for="cb-fajr">Fajr <span class="ar">الفجر</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-sunrise"         onchange="onChg()"><label for="cb-sunrise">Sunrise <span class="ar">الشروق</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-dhuhr"   checked onchange="onChg()"><label for="cb-dhuhr">Dhuhr <span class="ar">الظهر</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-asr"     checked onchange="onChg()"><label for="cb-asr">Asr <span class="ar">العصر</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-maghrib" checked onchange="onChg()"><label for="cb-maghrib">Maghrib <span class="ar">المغرب</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-isha"    checked onchange="onChg()"><label for="cb-isha">Isha <span class="ar">العشاء</span></label></span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="lbl">Event starts before adhan</label>
+            <div class="slider-row">
+              <input type="range" id="sl-before" min="0" max="60" step="5" value="0" oninput="updSlider('before')">
+              <span class="sv" id="sv-before">0 min</span>
+            </div>
+            <span class="hint">Reminder window before the call to prayer</span>
+          </div>
+
+          <div class="field">
+            <label class="lbl">Event ends after adhan</label>
+            <div class="slider-row">
+              <input type="range" id="sl-after" min="5" max="120" step="5" value="30" oninput="updSlider('after')">
+              <span class="sv" id="sv-after">30 min</span>
+            </div>
+            <span class="hint">Prayer window duration after adhan</span>
+          </div>
+
+          <div class="days-row">
+            <div class="field">
+              <label class="lbl" for="d-before">Days before today</label>
+              <input type="number" id="d-before" class="inp" min="0" max="90" value="0">
+            </div>
+            <div class="field">
+              <label class="lbl" for="d-after">Days ahead</label>
+              <input type="number" id="d-after" class="inp" min="1" max="365" value="60">
+            </div>
+          </div>
+
+        </div><!-- /body-set -->
+      </div><!-- /sect-set -->
+
+    </div><!-- /sb-scroll -->
+
+    <!-- Sticky action footer -->
+    <div class="sb-foot">
+      <div class="act-row">
+        <button class="btn-prev" id="prev-btn" onclick="doTogglePreview()">👁 Preview</button>
+        <button class="btn-gen"  id="gen-btn"  onclick="doGenerate()" disabled>Generate Feed</button>
+      </div>
+      <p class="err-msg" id="gen-err"></p>
+    </div>
+  </aside>
+
+  <!-- ══ RIGHT MAIN ══════════════════════════════════════════════ -->
+  <div class="main">
+
+    <!-- Map -->
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-tip">Click map · drag marker · or search above</div>
+    </div>
+
+    <!-- Preview panel -->
+    <div class="prev-panel" id="prev-panel">
+      <div class="prev-topbar">
+        <span class="prev-title">Preview</span>
+        <div class="prev-nav">
+          <button class="nav-btn" onclick="shiftWk(-1)">← Prev</button>
+          <span class="prev-period" id="prev-period">—</span>
+          <button class="nav-btn" onclick="shiftWk(1)">Next →</button>
+        </div>
+      </div>
+      <div class="tz-bar">Times for timezone: <span id="tz-label">—</span></div>
+      <div class="prev-grid" id="prev-grid"></div>
+    </div>
+
+    <!-- URL output -->
+    <div class="url-sect" id="url-sect">
+      <div class="url-card">
+        <div class="url-lbl">📅 Subscribe URL <span class="badge b-ap">Apple Calendar</span> <span class="badge b-ol">Outlook for Mac</span></div>
+        <div class="url-txt" id="webcal-url">—</div>
+        <div class="url-acts">
+          <button class="btn btn-prim" id="sub-btn" onclick="doSubscribe()">Subscribe in Calendar</button>
+          <button class="btn btn-ghost" onclick="cpURL('webcal-url','cpfb1')">Copy Link</button>
+          <span class="cpfb" id="cpfb1">Copied!</span>
+        </div>
+      </div>
+      <div class="url-card">
+        <div class="url-lbl">🔗 HTTPS URL <span class="badge b-ol">Outlook Web/Desktop</span> <span class="badge b-gc">Google Calendar</span></div>
+        <div class="url-txt" id="https-url">—</div>
+        <div class="url-acts">
+          <button class="btn btn-ghost" onclick="cpURL('https-url','cpfb2')">Copy URL</button>
+          <a id="dl-ics" class="btn btn-ghost" href="#" download="prayer-times.ics">Download .ics</a>
+          <span class="cpfb" id="cpfb2">Copied!</span>
+        </div>
+      </div>
+      <div class="how-to">
+        <strong>How to subscribe:</strong>
+        <ol>
+          <li><strong>Outlook Web/Desktop:</strong> Calendar → Add calendar → Subscribe from web → paste HTTPS URL.</li>
+          <li><strong>Apple Calendar:</strong> Click <em>Subscribe in Calendar</em>, or File → New Calendar Subscription.</li>
+          <li><strong>Google Calendar:</strong> Other calendars → From URL → paste HTTPS URL.</li>
+        </ol>
+        <p style="margin-top:.5rem">The feed auto-refreshes every 12 hours, so times stay current.</p>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+/* ================================================================
+   PrayTimes JS  (port of PrayTime.php v1.2.2 by Hamid Zarrabi-Zadeh)
+================================================================ */
+class PT {
+  static M = {
+    0:[16,  0,4,  0,14  ], 1:[18,  1,0,  0,18  ], 2:[15,  1,0,  0,15  ],
+    3:[18,  1,0,  0,17  ], 4:[18.5,1,0,  1,90  ], 5:[19.5,1,0,  0,17.5],
+    6:[18,  1,0,  0,17  ], 7:[17.7,0,4.5,0,14  ],
+  };
+  constructor(m=3,a=0){ this.m=m; this.a=a; this.hl=3; this.it=1; }
+  getTimes(y,mo,d,lat,lng,tz){
+    this.lat=lat; this.lng=lng; this.tz=tz;
+    this.jd=this._jul(y,mo,d)-lng/(15*24);
+    return this._day();
+  }
+  _day(){ let t=[5,6,12,13,18,18,18]; for(let i=0;i<this.it;i++) t=this._cmp(t); return this._adj(t); }
+  _cmp(t){
+    const d=t.map(x=>x/24), p=PT.M[this.m]||PT.M[3];
+    return [this._tm(180-p[0],d[0]),this._tm(180-.833,d[1]),this._md(d[2]),
+            this._as(1+this.a,d[3]),this._tm(.833,d[4]),this._tm(p[2],d[5]),this._tm(p[4],d[6])];
+  }
+  _adj(t){
+    for(let i=0;i<7;i++) t[i]+=this.tz-this.lng/15;
+    const p=PT.M[this.m]||PT.M[3];
+    if(p[1]===1) t[5]=t[4]+p[2]/60;
+    if(p[3]===1) t[6]=t[5]+p[4]/60;
+    if(this.hl) t=this._hl(t,p);
+    return t;
+  }
+  _hl(t,p){
+    const n=this._fh(t[4]-t[1]);
+    const fd=this._np(p[0])*n; if(!isFinite(t[0])||this._fh(t[1]-t[0])>fd) t[0]=t[1]-fd;
+    const ia=p[3]===0?p[4]:18, id=this._np(ia)*n; if(!isFinite(t[6])||this._fh(t[6]-t[4])>id) t[6]=t[4]+id;
+    const ma=p[1]===0?p[2]:4,  md=this._np(ma)*n; if(!isFinite(t[5])||this._fh(t[5]-t[4])>md) t[5]=t[4]+md;
+    return t;
+  }
+  _np(a){ return this.hl===3?a/60:this.hl===1?.5:this.hl===2?1/7:0; }
+  _md(t){ return this._fh(12-this._eq(this.jd+t)); }
+  _sp(jd){ const D=jd-2451545,g=this._fa(357.529+.9856e-2*D),q=this._fa(280.459+.9856474e-2*D),L=this._fa(q+1.915*this._ds(g)+.02*this._ds(2*g)),e=23.439-3.6e-7*D;return[this._das(this._ds(e)*this._ds(L)),q/15-this._fh(this._dt2(this._dc(e)*this._ds(L),this._dc(L))/15)]; }
+  _eq(jd){ return this._sp(jd)[1]; }
+  _sd(jd){ return this._sp(jd)[0]; }
+  _tm(G,t){ const D=this._sd(this.jd+t),Z=this._md(t),V=(1/15)*this._dac((-this._ds(G)-this._ds(D)*this._ds(this.lat))/(this._dc(D)*this._dc(this.lat))); return Z+(G>90?-V:V); }
+  _as(s,t){ const D=this._sd(this.jd+t),G=-this._dat(1/Math.tan((s+Math.tan(Math.abs(this.lat-D)*Math.PI/180))*Math.PI/180)||0); return this._tm(G,t); }
+  _jul(y,m,d){ if(m<=2){y--;m+=12;} const A=Math.floor(y/100),B=2-A+Math.floor(A/4); return Math.floor(365.25*(y+4716))+Math.floor(30.6001*(m+1))+d+B-1524.5; }
+  _r(d){ return d*Math.PI/180; }
+  _ds(d){ return Math.sin(this._r(d)); } _dc(d){ return Math.cos(this._r(d)); }
+  _das(x){ return Math.asin(x)*180/Math.PI; } _dac(x){ return Math.acos(x)*180/Math.PI; }
+  _dat(x){ return Math.atan(x)*180/Math.PI; } _dt2(y,x){ return Math.atan2(y,x)*180/Math.PI; }
+  _fa(a){ a=a-360*Math.floor(a/360); return a<0?a+360:a; }
+  _fh(a){ a=a-24*Math.floor(a/24);  return a<0?a+24:a; }
+}
+
+/* ================================================================
+   App State
+================================================================ */
+const S = {
+  lat:null, lng:null, name:'',
+  tz: Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
+  prevWk:0, prevOn:false,
+};
+
+const PI = {
+  fajr:   {idx:0,en:'Fajr',   ar:'الفجر'},
+  sunrise:{idx:1,en:'Sunrise',ar:'الشروق'},
+  dhuhr:  {idx:2,en:'Dhuhr',  ar:'الظهر'},
+  asr:    {idx:3,en:'Asr',    ar:'العصر'},
+  maghrib:{idx:5,en:'Maghrib',ar:'المغرب'},
+  isha:   {idx:6,en:'Isha',   ar:'العشاء'},
+};
+
+/* ================================================================
+   Map
+================================================================ */
+let map, marker;
+function initMap(){
+  map = L.map('map',{center:[21.3891,39.8579],zoom:3});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'© <a href="https://openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+    subdomains:'abcd', maxZoom:19,
+  }).addTo(map);
+
+  const icon = L.divIcon({className:'',
+    html:`<div style="width:16px;height:16px;background:#C9962D;border:2.5px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.6)"></div>`,
+    iconSize:[16,16], iconAnchor:[8,16],
+  });
+  marker = L.marker([21.3891,39.8579],{draggable:true,icon}).addTo(map);
+  map.on('click', e=>{ setLoc(e.latlng.lat,e.latlng.lng,''); revGeo(e.latlng.lat,e.latlng.lng); });
+  marker.on('dragend',()=>{ const p=marker.getLatLng(); setLoc(p.lat,p.lng,''); revGeo(p.lat,p.lng); });
+}
+
+/* ================================================================
+   Location
+================================================================ */
+function setLoc(lat,lng,name){
+  S.lat=lat; S.lng=lng; if(name) S.name=name;
+  marker.setLatLng([lat,lng]);
+  map.setView([lat,lng],Math.max(map.getZoom(),10));
+  document.getElementById('lat-pill').textContent=`${lat.toFixed(5)}°`;
+  document.getElementById('lng-pill').textContent=`${lng.toFixed(5)}°`;
+  document.getElementById('coord-wrap').classList.add('show');
+  if(name){ document.getElementById('loc-name').textContent=name; document.getElementById('meta-loc').textContent=name; }
+  else { document.getElementById('meta-loc').textContent=`${lat.toFixed(3)}, ${lng.toFixed(3)}`; }
+  document.getElementById('gen-btn').disabled=false;
+  if(S.prevOn) renderPrev();
+}
+
+async function revGeo(lat,lng){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,{headers:{'Accept-Language':'en'}});
+    const d=await r.json();
+    const n=d.address?.city||d.address?.town||d.address?.village||d.address?.county||'';
+    if(n){ S.name=n; document.getElementById('loc-name').textContent=n; document.getElementById('meta-loc').textContent=n; }
+  }catch(e){}
+}
+
+function getMyLocation(){
+  const btn=document.getElementById('geo-btn'), err=document.getElementById('geo-err');
+  err.style.display='none';
+  if(!navigator.geolocation){ showErr(err,'Geolocation not supported.'); return; }
+  btn.textContent='…'; btn.disabled=true;
+  navigator.geolocation.getCurrentPosition(
+    p=>{ btn.textContent='◎ My Location'; btn.disabled=false; setLoc(p.coords.latitude,p.coords.longitude,''); revGeo(p.coords.latitude,p.coords.longitude); },
+    e=>{ btn.textContent='◎ My Location'; btn.disabled=false; showErr(err,'Could not get location: '+e.message); },
+    {timeout:10000}
+  );
+}
+function showErr(el,msg){ el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',4000); }
+
+/* ================================================================
+   City search
+================================================================ */
+let sTimer=null;
+document.getElementById('city-search').addEventListener('input',function(){
+  clearTimeout(sTimer); const q=this.value.trim();
+  if(q.length<3){hideAC();return;}
+  sTimer=setTimeout(()=>doSearch(q),380);
+});
+document.getElementById('city-search').addEventListener('keydown',e=>{ if(e.key==='Escape') hideAC(); });
+document.addEventListener('click',e=>{ if(!e.target.closest('.search-wrap')) hideAC(); });
+
+async function doSearch(q){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6`,{headers:{'Accept-Language':'en'}});
+    const rs=await r.json();
+    const ac=document.getElementById('autocomplete');
+    ac.innerHTML='';
+    if(!rs.length){hideAC();return;}
+    rs.forEach(res=>{
+      const el=document.createElement('div'); el.className='ac-item';
+      const nm=res.name||res.display_name.split(',')[0];
+      const dt=res.display_name.split(',').slice(1,3).join(',').trim();
+      el.innerHTML=`<div class="ac-name">${esc(nm)}</div><div class="ac-sub">${esc(dt)}</div>`;
+      el.onclick=()=>{ setLoc(parseFloat(res.lat),parseFloat(res.lon),nm); document.getElementById('city-search').value=nm; hideAC(); };
+      ac.appendChild(el);
+    });
+    ac.classList.remove('hidden');
+  }catch(e){hideAC();}
+}
+function hideAC(){ document.getElementById('autocomplete').classList.add('hidden'); }
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ================================================================
+   Sliders + settings change
+================================================================ */
+function updSlider(w){
+  const v=parseInt(document.getElementById(`sl-${w}`).value);
+  document.getElementById(`sv-${w}`).textContent=v===0?'0 min':`${v} min`;
+  onChg();
+}
+function onChg(){
+  const sel=document.getElementById('method');
+  const mn=sel.options[sel.selectedIndex].text.split('—')[0].trim().replace(/\s*\(.*\)/,'').trim();
+  const b=document.getElementById('sl-before').value, a=document.getElementById('sl-after').value;
+  document.getElementById('meta-set').textContent=`${mn} · ${b}/${a} min`;
+  if(S.prevOn) renderPrev();
+}
+
+/* ================================================================
+   Section toggle (mobile)
+================================================================ */
+function toggleSect(id){
+  const mob=window.innerWidth<=768&&window.innerHeight>window.innerWidth;
+  const land=window.innerWidth<=768&&window.innerWidth>window.innerHeight;
+  if(!mob&&!land) return; // always open on desktop
+  const body=document.getElementById(`body-${id}`);
+  const chev=document.getElementById(`chev-${id}`);
+  body.classList.toggle('collapsed');
+  chev.classList.toggle('open');
+}
+
+/* ================================================================
+   TZ offset helper
+================================================================ */
+function getTzOff(tz,y,m,d){
+  try{
+    const u=new Date(Date.UTC(y,m-1,d,12,0,0));
+    const s=new Intl.DateTimeFormat('en-US',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).format(u);
+    const [h,mi]=s.split(':').map(Number);
+    let o=(h+mi/60)-12; if(o<-13)o+=24; if(o>14)o-=24; return o;
+  }catch(e){ return -(new Date().getTimezoneOffset())/60; }
+}
+
+/* ================================================================
+   Formatting
+================================================================ */
+function fmtFH(fh){ const t=((Math.round(fh*60)%1440)+1440)%1440; return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; }
+function fmtMn(mn){ const t=((Math.round(mn)%1440)+1440)%1440; return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; }
+
+/* ================================================================
+   Preview
+================================================================ */
+function doTogglePreview(){
+  if(!S.lat||!S.lng){
+    const e=document.getElementById('gen-err'); e.textContent='Select a location first.'; e.style.display='block';
+    setTimeout(()=>e.style.display='none',3000); return;
+  }
+  S.prevOn=!S.prevOn;
+  const panel=document.getElementById('prev-panel');
+  const btn=document.getElementById('prev-btn');
+  if(S.prevOn){ panel.classList.add('show'); btn.textContent='✕ Close Preview'; renderPrev();
+    panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+  } else { panel.classList.remove('show'); btn.textContent='👁 Preview'; }
+}
+
+function shiftWk(d){ S.prevWk+=d; renderPrev(); }
+
+function renderPrev(){
+  const tz    =document.getElementById('tz-in').value.trim()||S.tz;
+  const method=parseInt(document.getElementById('method').value);
+  const asr   =parseInt(document.getElementById('asr-m').value);
+  const before=parseInt(document.getElementById('sl-before').value);
+  const after =parseInt(document.getElementById('sl-after').value);
+  const keys  =Object.keys(PI).filter(p=>{ const c=document.getElementById(`cb-${p}`); return c&&c.checked; });
+
+  document.getElementById('tz-label').textContent=tz;
+
+  // Week bounds (Monday-based)
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dow=today.getDay(), monOff=dow===0?-6:1-dow;
+  const ws=new Date(today); ws.setDate(today.getDate()+monOff+S.prevWk*7);
+  const we=new Date(ws);    we.setDate(ws.getDate()+6);
+  const fd=dt=>dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  document.getElementById('prev-period').textContent=`${fd(ws)} – ${fd(we)} ${we.getFullYear()}`;
+
+  const calc=new PT(method,asr);
+  const grid=document.getElementById('prev-grid');
+  grid.innerHTML='';
+  if(!S.lat||!S.lng){ grid.innerHTML='<div class="prev-empty">Select a location above to see prayer times.</div>'; return; }
+
+  const todayStr=today.toDateString();
+  for(let i=0;i<7;i++){
+    const dt=new Date(ws); dt.setDate(ws.getDate()+i);
+    const y=dt.getFullYear(),mo=dt.getMonth()+1,d=dt.getDate();
+    const isToday=dt.toDateString()===todayStr;
+    const off=getTzOff(tz,y,mo,d);
+    const times=calc.getTimes(y,mo,d,S.lat,S.lng,off);
+
+    const el=document.createElement('div');
+    el.className='p-day'+(isToday?' today':'');
+    el.innerHTML=`<div class="day-hdr">
+      <div class="day-wd">${dt.toLocaleDateString('en-GB',{weekday:'short'})}</div>
+      <div class="day-d">${d} ${dt.toLocaleDateString('en-GB',{month:'short'})}</div>
+      ${isToday?'<div class="today-tag">Today</div>':''}
+    </div>`;
+
+    keys.forEach(k=>{
+      const p=PI[k]; const ft=times[p.idx]; if(!isFinite(ft)) return;
+      const am=ft*60, sm=am-before, em=am+after;
+      const row=document.createElement('div'); row.className='pr-row';
+      row.innerHTML=`<div class="pr-names"><span class="pr-en">${p.en}</span><span class="pr-ar">${p.ar}</span></div>
+        <span class="pr-time">${fmtFH(ft)}</span>
+        <span class="pr-win">${fmtMn(sm)} – ${fmtMn(em)}</span>`;
+      el.appendChild(row);
+    });
+    grid.appendChild(el);
+  }
+}
+
+/* ================================================================
+   Generate feed URL
+================================================================ */
+function doGenerate(){
+  if(!S.lat||!S.lng){
+    const e=document.getElementById('gen-err'); e.textContent='Select a location first.'; e.style.display='block'; return;
+  }
+  document.getElementById('gen-err').style.display='none';
+  const tz    =document.getElementById('tz-in').value.trim()||S.tz;
+  const method=document.getElementById('method').value;
+  const asr   =document.getElementById('asr-m').value;
+  const before=document.getElementById('sl-before').value;
+  const after =document.getElementById('sl-after').value;
+  const db    =Math.max(0,parseInt(document.getElementById('d-before').value)||0);
+  const da    =Math.max(1,parseInt(document.getElementById('d-after').value)||60);
+  const prayers=Object.keys(PI).filter(p=>{ const c=document.getElementById(`cb-${p}`); return c&&c.checked; });
+  if(!prayers.length){ const e=document.getElementById('gen-err'); e.textContent='Select at least one prayer.'; e.style.display='block'; return; }
+
+  const p=new URLSearchParams({lat:S.lat.toFixed(6),lng:S.lng.toFixed(6),method,asr,before,after,hours_before:db*24,hours_after:da*24,tz,prayers:prayers.join(','),location:S.name||''});
+  const base='https://prayer.hablullah.app/prayer.php';
+  const httpsURL=`${base}?${p}`;
+  const webcalURL=httpsURL.replace('https://','webcal://');
+
+  document.getElementById('https-url').textContent=httpsURL;
+  document.getElementById('webcal-url').textContent=webcalURL;
+  document.getElementById('dl-ics').href=httpsURL;
+  document.getElementById('sub-btn').dataset.url=webcalURL;
+  const us=document.getElementById('url-sect'); us.classList.add('show');
+  us.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function doSubscribe(){ const u=document.getElementById('sub-btn').dataset.url; if(u) window.location.href=u; }
+async function cpURL(sid,fbid){
+  const txt=document.getElementById(sid).textContent;
+  try{ await navigator.clipboard.writeText(txt); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+  const fb=document.getElementById(fbid); fb.classList.add('show'); setTimeout(()=>fb.classList.remove('show'),2200);
+}
+
+/* ================================================================
+   Init
+================================================================ */
+document.addEventListener('DOMContentLoaded',()=>{
+  initMap();
+  document.getElementById('tz-in').value=S.tz;
+  updSlider('before'); updSlider('after'); onChg();
+
+  // Collapse settings section on mobile portrait by default
+  const isPortrait=()=>window.innerHeight>window.innerWidth;
+  const isMobile  =()=>window.innerWidth<=768;
+  if(isMobile()&&isPortrait()){
+    document.getElementById('body-set').classList.add('collapsed');
+    document.getElementById('chev-set').classList.remove('open');
+  }
+
+  // Re-init map on resize (needed when switching orientation)
+  window.addEventListener('resize',()=>{ map.invalidateSize(); });
+});
+</script>
+</body>
+</html>
