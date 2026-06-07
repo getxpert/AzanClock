@@ -1,8 +1,8 @@
 import React from 'react'
 import { FontAwesome } from '../data/FontAwesome';
 import lenovoM8Image from '../images/lenovo-m8-tab.jpg'
-import lenovoM10Image from '../images/lenovo-m10-tab.jpg'
 import zakatTrackerLogo from '../images/zakat-tracker-logo.png'
+
 
 export default function About() {
 
@@ -11,7 +11,7 @@ export default function About() {
 
             As Salamu Alaykum
             <p></p>
-            Use AzanClock.com to turn any Android, Amazon Echo or Raspberry Pi device into an actual azan clock.
+           This is a version developed by getXpert.com based on the original app by AzanClock.com. It lets you turn any Android device, Amazon Echo, or Raspberry Pi into an Azan clock.
             <p></p>
 
             <div className='d-flex flex-column gap-2'>
@@ -98,13 +98,13 @@ export default function About() {
                     <a className='whiteLink fs-3' title='Privacy Policy' href="/privacy-policy/" rel="noreferrer">{FontAwesome.Shield}</a>
                 </div>
                 <div>
-                    <a className='whiteLink fs-3' title='Open Source Code' href="https://github.com/azanclock/pwa" rel="noreferrer">{FontAwesome.Github}</a>
+                    <a className='whiteLink fs-3' title='Open Source Code' href="https://github.com/getxpert/AzanClock" rel="noreferrer">{FontAwesome.Github}</a>
                 </div>
                 <div>
                     <a className='whiteLink fs-3' title='Prayer Times Chrome Extension' href="https://chrome.google.com/webstore/detail/prayer-times-chrome-exten/fbkmgnkliklgbmanjkmiihkdioepnkce">{FontAwesome.Chrome}</a>
                 </div>
                 <div>
-                    <a className='whiteLink fs-3' title='info@azanclock.com' href="mailto:info@azanclock.com">{FontAwesome.Envelope}</a>
+                    <a className='whiteLink fs-3' title='contact@getxpert.com' href="mailto:contact@getxpert.com">{FontAwesome.Envelope}</a>
                 </div>
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { toast, ToastContainer } from 'react-toastify';
 import { SmartAzanClock } from './scripts/SmartAzanClock';
 import { AAA } from './data/Audios';
@@ -8,7 +8,9 @@ import Loading from './components/Loading';
 import Clock from './components/Clock';
 import AudioPlayer from './components/AudioPlayer';
 import SilkSilentAudio from './components/SilkSilentAudio'
+import UpdateModal from './components/UpdateModal';
 import { weatherService } from './services/WeatherService';
+import { versionService } from './services/VersionService';
 
 export const AppContext = React.createContext();
 
@@ -18,6 +20,10 @@ export default function AppContextProvider() {
     const [showLoading, setShowLoading] = useState(false);
     const [isAudioPlaying, setIsAudioPlaying] = useState(false);
     const [isSilkBrowser, setIsSilkBrowser] = useState(false);
+    // updateInfo holds the server version details when a newer version is available.
+    // null means no update pending (or user snoozed it).
+    const [updateInfo, setUpdateInfo] = useState(null);
+    const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [weatherData, setWeatherData] = useState(() => {
         // Restore last cached weather data immediately so the overlay shows on first render
         try {
@@ -41,6 +47,13 @@ export default function AppContextProvider() {
 
     })
 
+    // Keep a ref to the latest output/showMenu so the interval callback always
+    // sees current values without needing to be re-registered on every render.
+    const outputRef = useRef(output)
+    const showMenuRef = useRef(showMenu)
+    useEffect(() => { outputRef.current = output }, [output])
+    useEffect(() => { showMenuRef.current = showMenu }, [showMenu])
+
     useEffect(() => {
 
         const interval = setInterval(() => {
@@ -51,14 +64,15 @@ export default function AppContextProvider() {
                 initUser('initUser: settings removed or upgraded');
             }
             else {
-                if (!output || seconds === 0 || showMenu) {
+                if (!outputRef.current || seconds === 0 || showMenuRef.current) {
                     setOutput(SmartAzanClock.run('appContext-useEffect'))
                 }
                 setShowLoading(false);
             }
         }, 1000);
         return () => clearInterval(interval)
-    })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []) // stable interval — refs keep values current without re-registering
 
     useEffect(() => {
         const userAgent = navigator.userAgent || '';
@@ -84,7 +98,14 @@ export default function AppContextProvider() {
                 });
             }
         }
-        
+
+        // Initialize version service — shows a modal when a newer version is
+        // available on the server and triggers a SW update check.
+        versionService.initialize((updateInfo) => {
+            setUpdateInfo(updateInfo);
+            setShowUpdateModal(true);
+        });
+        /*
         // If not running under azanclock.com, show a persistent toast advising re-install
         try {
             const hostname = (window.location.hostname || '').toLowerCase();
@@ -104,10 +125,12 @@ export default function AppContextProvider() {
         } catch (e) {
             // ignore errors (e.g., window not available)
         }
+        */
         
-        // Cleanup: stop weather service when component unmounts
+        // Cleanup: stop weather service and version service when component unmounts
         return () => {
             weatherService.stop();
+            versionService.stop();
         };
     }, [])
 
@@ -193,11 +216,23 @@ export default function AppContextProvider() {
     }
 
     return (
-        <AppContext.Provider value={{ showMenu, setShowMenu, showMsg, showPersistentToast, isAudioPlaying, setIsAudioPlaying, weatherData, ...output, updateSettings, updateOffset, previewAudio, reciteQuranAudio, dol }}>
+        <AppContext.Provider value={{ showMenu, setShowMenu, showMsg, showPersistentToast, isAudioPlaying, setIsAudioPlaying, weatherData, updateInfo, setShowUpdateModal, ...output, updateSettings, updateOffset, previewAudio, reciteQuranAudio, dol }}>
             {output ? <Clock /> : null}
             {showLoading ? <Loading /> : null}
             {output ? <Menu /> : null}
             {output ? <AudioPlayer /> : null}
+            <UpdateModal
+                show={showUpdateModal}
+                updateInfo={updateInfo}
+                onUpdate={() => {
+                    setShowUpdateModal(false);
+                    versionService.triggerUpdate();
+                }}
+                onDismiss={() => {
+                    if (updateInfo) versionService.snoozeUpdate(updateInfo.version);
+                    setShowUpdateModal(false);
+                }}
+            />
             <ToastContainer autoClose={2000} limit={1} />
             {isSilkBrowser && <SilkSilentAudio />}
         </AppContext.Provider>

@@ -10,11 +10,13 @@ import { AppContext } from '../AppContext';
 import { FontAwesome } from '../data/FontAwesome';
 import { format12 } from '../scripts/SmartAzanClock';
 import defaultTempColours from '../data/temperatureColours.json';
+import { versionService } from '../services/VersionService';
 
 export default function Settings() {
 
     const { vakits, arcVakits, calculationSettings, locationSettings, deviceSettings, azanSettings,
-        offsetSettings, updateOffset, previewAudio, oneThirdTime, twoThirdTime, midnightTime } = useContext(AppContext)
+        offsetSettings, updateOffset, previewAudio, oneThirdTime, twoThirdTime, midnightTime,
+        updateInfo, setShowUpdateModal } = useContext(AppContext)
 
     // Load temperature colour bands from localStorage (falls back to bundled defaults)
     const loadTempColours = () => {
@@ -112,22 +114,12 @@ export default function Settings() {
             </div>
 
             <div className="mt-2">
-                <span className='badge mb-1 p-0'>Screen Saver Mode</span>
-                <Options name="deviceSettings.screenSaver" selectedValue={deviceSettings.screenSaver} values={AzanCallOptions} />
-            </div>
-
-            <div className="mt-2">
-                <span className='badge mb-1 p-0'>Zoomed In Mode</span>
-                <Options name="deviceSettings.zoomedIn" selectedValue={deviceSettings.zoomedIn} values={AzanCallOptions} />
-            </div>
-
-            <div className="mt-2">
                 <span className='badge mb-1 p-0'>Clock Style</span>
                 <Options name="deviceSettings.clockStyle" selectedValue={deviceSettings.clockStyle}
                     values={[
                         { id: 'A', name: '🕐 Analogue' },
-                        { id: 'D', name: '🔢 Digital'  },
-                        { id: 'B', name: '⊕ Both'      },
+                        { id: 'D', name: '🔢 Digital'  }
+                  
                     ]} />
             </div>
 
@@ -137,6 +129,28 @@ export default function Settings() {
                     values={[
                         { id: '12', name: '🕛 12-hour' },
                         { id: '24', name: '🕐 24-hour' },
+                    ]} />
+            </div>
+
+            <div className="mt-2">
+                <span className='badge mb-1 p-0'>Events in Sidebar</span>
+                <Options name="deviceSettings.eventsCount" selectedValue={String(deviceSettings.eventsCount ?? 3)}
+                    values={[
+                        { id: '1', name: '1 event'  },
+                        { id: '2', name: '2 events' },
+                        { id: '3', name: '3 events' },
+                        { id: '4', name: '4 events' },
+                        { id: '5', name: '5 events' },
+                    ]} />
+            </div>
+
+            <div className="mt-2">
+                <span className='badge mb-1 p-0'>Hadith Language</span>
+                <Options name="deviceSettings.hadithLang" selectedValue={deviceSettings.hadithLang || 'both'}
+                    values={[
+                        { id: 'arabic',  name: '🕌 Arabic only'  },
+                        { id: 'english', name: '🌐 English only' },
+                        { id: 'both',    name: '🌍 Both'         },
                     ]} />
             </div>
 
@@ -159,43 +173,172 @@ export default function Settings() {
 
             {/* ── Temperature Colour Bands ─────────────────────────────────── */}
             <div className="mt-3">
-                <span className='badge mb-2 p-0'>Temperature Colour Bands (°C symbol)</span>
-                <div style={{ fontSize: '0.8rem' }}>
-                    {tempColours.bands.map((band, i) => (
-                        <div key={i} className='d-flex flex-row align-items-center gap-2 mb-1'>
-                            <span style={{ width: 60, color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
-                                {band.min === -999 ? '< 0' : `≥ ${band.min}`}°C
-                            </span>
-                            <span style={{
-                                flex: 1,
-                                color: 'rgba(255,255,255,0.75)',
-                                fontSize: '0.75rem',
-                            }}>{band.label}</span>
-                            {/* Unit colour swatch + picker */}
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-                                <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>°C</span>
-                                <span style={{
-                                    display: 'inline-block', width: 22, height: 22,
-                                    borderRadius: 4, border: '1px solid rgba(255,255,255,0.3)',
-                                    background: band.unit, cursor: 'pointer',
-                                }} />
-                                <input type='color' value={band.unit}
-                                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-                                    onChange={(e) => {
-                                        const updated = { ...tempColours, bands: tempColours.bands.map((b, j) => j === i ? { ...b, unit: e.target.value } : b) };
-                                        setTempColours(updated);
-                                        localStorage.setItem('temperatureColours', JSON.stringify(updated));
-                                    }} />
-                            </label>
-                        </div>
-                    ))}
-                    <button className='btn btn-sm btn-outline-secondary mt-1'
+                <div className='d-flex flex-row align-items-center gap-2 mb-2'>
+                    <span className='badge p-0'>Temperature Colour Bands (°C symbol)</span>
+                    <button className='btn btn-sm btn-outline-secondary py-0 px-1' style={{ fontSize: '0.65rem', lineHeight: 1.4 }}
                         onClick={() => {
                             setTempColours(defaultTempColours);
                             localStorage.removeItem('temperatureColours');
                         }}>Reset to defaults</button>
-                </div>
+                </div>                {(() => {
+                    const BAR_MIN = -5;
+                    const BAR_MAX = 45;
+                    const BAR_RANGE = BAR_MAX - BAR_MIN;
+
+                    // Build sorted bands (ascending by min, clamped to bar range)
+                    const sortedBands = (tempColours.bands || [])
+                        .filter(b => b.min !== -999)
+                        .slice()
+                        .sort((a, b) => a.min - b.min);
+
+                    // Build gradient stops: each band fills from its min to the next band's min
+                    const gradientStops = sortedBands.map((band, i) => {
+                        const next = sortedBands[i + 1];
+                        const startPct = Math.max(0, Math.min(100, ((band.min - BAR_MIN) / BAR_RANGE) * 100));
+                        const endPct   = next
+                            ? Math.max(0, Math.min(100, ((next.min - BAR_MIN) / BAR_RANGE) * 100))
+                            : 100;
+                        return `${band.unit} ${startPct.toFixed(1)}%, ${band.unit} ${endPct.toFixed(1)}%`;
+                    });
+                    const gradient = `linear-gradient(to right, ${gradientStops.join(', ')})`;
+
+                    // Tick marks to show on the bar (every 5°C)
+                    const ticks = [];
+                    for (let t = BAR_MIN; t <= BAR_MAX; t += 5) {
+                        ticks.push(t);
+                    }
+
+                    // Find which band index a given temp belongs to (for the colour picker)
+                    const getBandIndex = (temp) => {
+                        const desc = (tempColours.bands || []).slice().sort((a, b) => b.min - a.min);
+                        for (let i = 0; i < desc.length; i++) {
+                            if (temp >= desc[i].min) {
+                                // map back to original index
+                                return tempColours.bands.findIndex(b => b.min === desc[i].min);
+                            }
+                        }
+                        return -1;
+                    };
+
+                    return (
+                        <div style={{ fontSize: '0.8rem' }}>
+                            {/* Gradient bar */}
+                            <div style={{ position: 'relative', marginBottom: 28 }}>
+                                <div style={{
+                                    height: 28,
+                                    borderRadius: 6,
+                                    background: gradient,
+                                    border: '1px solid rgba(255,255,255,0.2)',
+                                    position: 'relative',
+                                }}>
+                                    {/* Colour pickers — one per band, positioned at band midpoint */}
+                                    {sortedBands.map((band, i) => {
+                                        const next = sortedBands[i + 1];
+                                        const startPct = Math.max(0, Math.min(100, ((band.min - BAR_MIN) / BAR_RANGE) * 100));
+                                        const endPct   = next
+                                            ? Math.max(0, Math.min(100, ((next.min - BAR_MIN) / BAR_RANGE) * 100))
+                                            : 100;
+                                        const midPct = (startPct + endPct) / 2;
+                                        const origIdx = getBandIndex(band.min);
+                                        return (
+                                            <label key={i} title={`${band.label} (${band.min === -999 ? '< 0' : `≥ ${band.min}`}°C) — click to change colour`}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '50%',
+                                                    left: `${midPct}%`,
+                                                    transform: 'translate(-50%, -50%)',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                }}>
+                                                <span style={{
+                                                    fontSize: '0.6rem',
+                                                    color: 'rgba(255,255,255,0.85)',
+                                                    textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                                                    whiteSpace: 'nowrap',
+                                                    pointerEvents: 'none',
+                                                    userSelect: 'none',
+                                                }}>{band.label}</span>
+                                                <input type='color' value={band.unit}
+                                                    style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                                                    onChange={(e) => {
+                                                        if (origIdx < 0) return;
+                                                        const updated = {
+                                                            ...tempColours,
+                                                            bands: tempColours.bands.map((b, j) =>
+                                                                j === origIdx ? { ...b, unit: e.target.value } : b
+                                                            )
+                                                        };
+                                                        setTempColours(updated);
+                                                        localStorage.setItem('temperatureColours', JSON.stringify(updated));
+                                                    }} />
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Temperature labels below the bar */}
+                                <div style={{ position: 'relative', height: 18, marginTop: 2 }}>
+                                    {ticks.map(t => {
+                                        const pct = ((t - BAR_MIN) / BAR_RANGE) * 100;
+                                        return (
+                                            <span key={t} style={{
+                                                position: 'absolute',
+                                                left: `${pct}%`,
+                                                transform: 'translateX(-50%)',
+                                                fontSize: '0.6rem',
+                                                color: 'rgba(255,255,255,0.6)',
+                                                whiteSpace: 'nowrap',
+                                            }}>{t}°</span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Hint */}
+
+                        </div>
+                    );
+                })()}
             </div>
+
+            {/* ── App Version ──────────────────────────────────────────────── */}
+            {(() => {
+                const installed = {
+                    version:     versionService.currentVersion,
+                    releaseDate: versionService.currentReleaseDate,
+                };
+                const formatDate = (iso) => {
+                    if (!iso || iso === '1970-01-01') return '—';
+                    try {
+                        return new Date(iso).toLocaleDateString(undefined, {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                        });
+                    } catch { return iso; }
+                };
+                const hasUpdate = updateInfo && versionService.hasUnacknowledgedUpdate;
+                return (
+                    <div className='mt-4 pt-3' style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div className='d-flex flex-row justify-content-between align-items-center'>
+                            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.45)' }}>
+                                <span>App v{installed.version}</span>
+                                <span className='mx-1'>·</span>
+                                <span>{formatDate(installed.releaseDate)}</span>
+                            </div>
+                            {hasUpdate && (
+                                <button
+                                    className='btn btn-sm btn-success py-0 px-2'
+                                    style={{ fontSize: '0.75rem' }}
+                                    onClick={() => setShowUpdateModal(true)}
+                                >
+                                    ⬆ Update Available v{updateInfo.version}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
 
         </div >
     )

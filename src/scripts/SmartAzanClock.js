@@ -190,11 +190,17 @@ export const SmartAzanClock = {
 
             a.angle = TimeToRadians(a.time, 24);
             this.settings.naflAlarmSettings[index] = a;
-            localStorage.setItem('settings', JSON.stringify({ ...this.settings }));
             if (this.currentTimeString === a.time && this.settings.deviceSettings.azanCallsEnabled === 'Y') {
                 setAAA(a.id, a.time);
             }
         })
+
+        // Persist nafl alarm times once after all have been computed (not per-alarm)
+        localStorage.setItem('settings', JSON.stringify({ ...this.settings }));
+
+        // Expose raw prayer times so consumers (e.g. EventsService) can resolve
+        // salah names to actual clock times for Hijri event scheduling.
+        this.output.prayerTimes = this.prayerTimes;
 
         this.output = { ...this.output, ...this.settings };
         return this.output;

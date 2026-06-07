@@ -6,7 +6,9 @@ import { StaleWhileRevalidate, NetworkOnly, NetworkFirst } from 'workbox-strateg
 
 clientsClaim();
 
-self.skipWaiting();
+// Do NOT call skipWaiting() unconditionally here.
+// The new SW will wait until the UI explicitly sends SKIP_WAITING,
+// giving the user control over when the update is applied.
 
 self.addEventListener("message", (event) => {
     if (event.data && event.data.type === "SKIP_WAITING") {
@@ -24,5 +26,5 @@ registerRoute("/privacy-policy/", new NetworkFirst());
 registerRoute(({ url }) => url.hostname === 'cdn.jsdelivr.net', new StaleWhileRevalidate());
 registerRoute("/reset/", new NetworkOnly());
 registerRoute(({ url }) => url.href.includes('mp3quran'), new NetworkOnly());
-
-
+// Always fetch version.json from the network so update checks are accurate.
+registerRoute(({ url }) => url.pathname === '/version.json', new NetworkOnly());

@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SalahCalendar — Prayer Times Calendar</title>
+<meta name="description" content="SalahCalendar — Generate a subscribable prayer times calendar for Outlook, Apple Calendar and Google Calendar.">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   THEME TOKENS
+══════════════════════════════════════════════════════════════════ */
+
+/* ── Light Theme (default) ─────────────────────────────────────── */
+:root, [data-theme="light"] {
+  --bg:          #F3F6F1;
+  --surf:        #FFFFFF;
+  --surf2:       #EAF0E6;
+  --border:      #C8D5C2;
+  --primary:     #1B7A56;
+  --primary-lt:  #22956A;
+  --primary-dim: rgba(27,122,86,.10);
+  --primary-glow:rgba(27,122,86,.05);
+  --amber:       #C08B18;
+  --amber-lt:    #D9A428;
+  --amber-dim:   rgba(192,139,24,.10);
+  --info:        #1A6B50;
+  --info-dim:    rgba(26,107,80,.08);
+  --info-text:   #1A6B50;
+  --text:        #1A2B22;
+  --text-inv:    #FFFFFF;
+  --muted:       #6A7F72;
+  --danger:      #C94A3A;
+  --shadow-sm:   0 1px 4px rgba(0,0,0,.06);
+  --shadow-md:   0 4px 16px rgba(0,0,0,.08);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,.10);
+  --r:           10px;
+  --rlg:         14px;
+  --font:        'DM Sans', sans-serif;
+  --ar:          'Amiri', serif;
+  --hdr:         54px;
+  --sb:          360px;
+  --hdr-bg:      linear-gradient(90deg,#1B7A56 0%,#228E64 100%);
+  --hdr-text:    #FFFFFF;
+  --hdr-border:  rgba(0,0,0,.10);
+  --inp-bg:      #FFFFFF;
+  --map-attr-bg: rgba(255,255,255,.85);
+}
+
+/* ── Dark Theme ────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:          #060E0A;
+  --surf:        #0C1A14;
+  --surf2:       #132A20;
+  --border:      #1E3A2C;
+  --primary:     #2E9B72;
+  --primary-lt:  #3EB888;
+  --primary-dim: rgba(46,155,114,.14);
+  --primary-glow:rgba(46,155,114,.07);
+  --amber:       #D4A020;
+  --amber-lt:    #E8B84B;
+  --amber-dim:   rgba(212,160,32,.14);
+  --info:        #2E8B72;
+  --info-dim:    rgba(46,139,114,.12);
+  --info-text:   #5DCBB0;
+  --text:        #DEE8E0;
+  --text-inv:    #0A1410;
+  --muted:       #7A9F8C;
+  --danger:      #E06050;
+  --shadow-sm:   0 1px 4px rgba(0,0,0,.20);
+  --shadow-md:   0 4px 16px rgba(0,0,0,.30);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,.45);
+  --hdr-bg:      linear-gradient(90deg,#0A1A12 0%,#0E2218 100%);
+  --hdr-text:    #DEE8E0;
+  --hdr-border:  rgba(255,255,255,.06);
+  --inp-bg:      var(--surf2);
+  --map-attr-bg: rgba(6,14,10,.80);
+}
+
+@media (min-width:1400px) { :root { --sb: 420px; } }
+@media (max-width:1100px) { :root { --sb: 310px; } }
+
+/* ── Reset ──────────────────────────────────────────────────────── */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+  font-family:var(--font); font-size:15px;
+  background:var(--bg); color:var(--text);
+  transition: background .3s ease, color .3s ease;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.hdr {
+  height: var(--hdr);
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  padding: 0 1.25rem;
+  background: var(--hdr-bg);
+  border-bottom: 1px solid var(--hdr-border);
+  position: sticky; top: 0; z-index: 900;
+  box-shadow: var(--shadow-md);
+}
+.brand { display:flex; align-items:center; gap:.6rem; }
+.brand-icon { height:30px; width:30px; border-radius:7px; box-shadow: 0 0 8px rgba(0,0,0,.15); }
+.brand-name { font-size:.95rem; color:var(--hdr-text); font-weight:600; letter-spacing:.04em; }
+.hdr-sep  { flex:1; }
+.hdr-tag  { font-size:.7rem; color:rgba(255,255,255,.7); letter-spacing:.1em; text-transform:uppercase;
+            border:1px solid rgba(255,255,255,.2); padding:.28rem .75rem; border-radius:100px; }
+
+/* Theme toggle */
+.theme-btn {
+  background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.2);
+  color:var(--hdr-text); border-radius:50%; width:32px; height:32px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:1rem; transition:all .2s;
+  flex-shrink:0;
+}
+.theme-btn:hover { background:rgba(255,255,255,.25); transform:scale(1.08); }
+
+/* ── App layout ─────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: var(--sb) 1fr;
+  height: calc(100vh - var(--hdr));
+  overflow: hidden;
+}
+
+/* ── Left sidebar ───────────────────────────────────────────────── */
+.sb {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surf);
+  transition: background .3s ease;
+}
+[data-theme="dark"] .sb { backdrop-filter: blur(12px); background: rgba(12,26,20,0.88); }
+.sb-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) transparent;
+}
+.sb-scroll::-webkit-scrollbar { width:4px; }
+.sb-scroll::-webkit-scrollbar-thumb { background:var(--primary-dim); border-radius:2px; }
+
+/* Section */
+.sect { border-bottom:1px solid var(--border); }
+.sect-btn {
+  width:100%; display:flex; align-items:center; gap:.6rem;
+  padding:.85rem 1.1rem; background:none; border:none; cursor:pointer;
+  color:var(--text); font-family:var(--font); font-size:.88rem;
+  text-align:left; transition:background .15s;
+}
+.sect-btn:hover { background:var(--primary-glow); }
+.sect-num {
+  width:22px; height:22px; border-radius:50%;
+  background:var(--primary-dim); border:1px solid var(--primary);
+  color:var(--primary); font-size:.7rem; font-weight:600;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.sect-name { font-weight:500; flex:1; }
+.sect-meta { font-size:.72rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+.sect-chev { color:var(--muted); font-size:.75rem; margin-left:.25rem; transition:transform .2s; }
+.sect-chev.open { transform:rotate(180deg); }
+
+.sect-body { padding:.15rem 1.1rem 1rem; }
+.sect-body.collapsed { display:none; }
+
+/* ── Form elements ──────────────────────────────────────────────── */
+.field  { display:flex; flex-direction:column; gap:.35rem; margin-bottom:.85rem; }
+.field:last-child { margin-bottom:0; }
+.lbl   { font-size:.76rem; color:var(--muted); font-weight:500; letter-spacing:.02em; }
+.hint  { font-size:.7rem; color:var(--muted); opacity:.7; margin-top:.1rem; }
+
+.inp {
+  width:100%; background:var(--inp-bg); border:1px solid var(--border);
+  border-radius:var(--r); color:var(--text); font-family:var(--font);
+  font-size:.85rem; padding:.58rem .85rem;
+  transition:border-color .2s, box-shadow .2s, background .3s; outline:none;
+  -webkit-appearance:none;
+}
+.inp:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-dim); }
+.inp::placeholder { color:var(--muted); }
+.inp.has-icon { padding-left:2.3rem; }
+select.inp {
+  cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='7'%3E%3Cpath d='M1 1l4.5 4.5L10 1' stroke='%236A7F72' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right .8rem center;
+  padding-right:2.2rem;
+}
+
+.search-wrap { position:relative; }
+.search-ic { position:absolute; left:.8rem; top:50%; transform:translateY(-50%); color:var(--muted); font-size:.9rem; pointer-events:none; }
+
+.ac-list { position:absolute; top:calc(100% + 4px); left:0; right:0;
+           background:var(--surf); border:1px solid var(--border); border-radius:var(--r);
+           z-index:2000; overflow:hidden; box-shadow:var(--shadow-lg); }
+.ac-list.hidden { display:none; }
+.ac-item { padding:.55rem .85rem; font-size:.81rem; cursor:pointer;
+           border-bottom:1px solid var(--border); transition:background .1s; }
+.ac-item:last-child { border-bottom:none; }
+.ac-item:hover { background:var(--primary-dim); color:var(--primary); }
+.ac-name { font-weight:500; }
+.ac-sub  { font-size:.72rem; color:var(--muted); }
+
+/* Geo row */
+.geo-row { display:flex; gap:.5rem; align-items:stretch; margin-top:.65rem; }
+.geo-row .search-wrap { flex:1; }
+.btn-geo { flex-shrink:0; background:var(--inp-bg); border:1px solid var(--border);
+           color:var(--muted); border-radius:var(--r); padding:.58rem .85rem;
+           font-family:var(--font); font-size:.8rem; cursor:pointer; transition:all .15s;
+           white-space:nowrap; }
+.btn-geo:hover { border-color:var(--primary); color:var(--primary); }
+
+/* Coord */
+.coord-wrap { display:none; margin-top:.75rem; padding:.6rem .8rem;
+              background:var(--primary-dim); border:1px solid rgba(27,122,86,.20);
+              border-radius:var(--r); gap:.5rem; flex-wrap:wrap; align-items:center; }
+.coord-wrap.show { display:flex; }
+.c-pill { font-family:monospace; font-size:.78rem; color:var(--primary); font-weight:600; }
+.c-name { font-size:.78rem; color:var(--muted); }
+
+/* Prayer checkboxes */
+.prayer-grid { display:grid; grid-template-columns:1fr 1fr; gap:.35rem .5rem; margin-top:.3rem; }
+.p-check { display:flex; align-items:center; gap:.35rem; }
+.p-check input { accent-color:var(--primary); width:14px; height:14px; cursor:pointer; flex-shrink:0; }
+.p-check label { cursor:pointer; font-size:.82rem; display:flex; align-items:baseline; gap:.25rem; }
+.p-check .ar { font-family:var(--ar); font-size:.9rem; color:var(--muted); }
+
+/* Sliders */
+.slider-row { display:flex; align-items:center; gap:.65rem; }
+.slider-row input[type=range] {
+  flex:1; -webkit-appearance:none; height:4px; background:var(--border);
+  border-radius:2px; outline:none; cursor:pointer;
+}
+.slider-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:16px; height:16px;
+  background:var(--primary); border-radius:50%;
+}
+.slider-row input[type=range]::-moz-range-thumb {
+  width:16px; height:16px; background:var(--primary); border-radius:50%; border:none;
+}
+.sv { min-width:50px; text-align:right; font-size:.82rem; color:var(--primary); font-weight:500; }
+
+/* Days row */
+.days-row { display:grid; grid-template-columns:1fr 1fr; gap:.65rem; }
+.err-msg { font-size:.78rem; color:var(--danger); padding:.3rem 0 0; display:none; }
+
+/* ── Right main column ──────────────────────────────────────────── */
+.main {
+  display:flex; flex-direction:column;
+  overflow:hidden;
+  background:var(--bg);
+  transition: background .3s ease;
+}
+
+/* Tabs Header */
+.tabs-hdr {
+  display: flex;
+  background: var(--surf);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1rem;
+  gap: 1.5rem;
+}
+.tab-btn {
+  background: none; border: none; padding: 1rem 0;
+  font-family: var(--font); font-size: .88rem; font-weight: 500;
+  color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color .2s, border-color .2s;
+}
+.tab-btn:hover { color: var(--primary); }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.tab-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dim) transparent;
+  display: none;
+}
+.tab-content.active { display: block; }
+.tab-content::-webkit-scrollbar { width:5px; }
+.tab-content::-webkit-scrollbar-thumb { background:var(--primary-dim); border-radius:3px; }
+
+
+/* Map */
+.map-wrap { position:relative; width:100%; height:100%; min-height:400px; }
+#map {
+  width:100%;
+  height: 100%;
+}
+.map-tip {
+  position:absolute; bottom:1.5rem; left:50%; transform:translateX(-50%);
+  background:var(--surf); border:1px solid var(--border);
+  color:var(--muted); font-size:.72rem; padding:.3rem .8rem;
+  border-radius:100px; pointer-events:none; white-space:nowrap;
+  box-shadow:var(--shadow-md); z-index: 1000;
+}
+[data-theme="dark"] .map-tip { backdrop-filter:blur(6px); background:rgba(12,26,20,.85); }
+
+/* ── Preview panel ───────────────────────────────────────────────── */
+.prev-panel { padding-bottom: 2rem; }
+.prev-topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.8rem 1.25rem; background:var(--surf2);
+  border-bottom:1px solid var(--border); flex-wrap:wrap; gap:.5rem;
+}
+.prev-title { font-size:.75rem; font-weight:600; text-transform:uppercase;
+              letter-spacing:.07em; color:var(--muted); }
+.prev-nav   { display:flex; align-items:center; gap:.5rem; }
+.prev-period { font-size:.88rem; color:var(--text); font-weight:500;
+               min-width:190px; text-align:center; }
+.nav-btn {
+  background:var(--surf); border:1px solid var(--border); color:var(--muted);
+  border-radius:6px; padding:.3rem .75rem; cursor:pointer;
+  font-family:var(--font); font-size:.8rem; transition:all .15s;
+  box-shadow: var(--shadow-sm);
+}
+.nav-btn:hover { border-color:var(--primary); color:var(--primary); }
+.tz-bar { font-size:.75rem; color:var(--muted); padding:.45rem 1.25rem;
+          background:var(--primary-glow); border-bottom:1px solid var(--border); }
+.tz-bar span { color:var(--primary); font-weight:500; }
+
+/* 7-day grid */
+.prev-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+.empty-state { display:flex; align-items:center; justify-content:center;
+              padding:4rem; color:var(--muted); font-size:1rem; text-align:center; }
+
+.p-day { border-right:1px solid var(--border); padding:1rem .75rem; min-width:0; }
+.p-day:last-child { border-right:none; }
+.p-day.today { background:var(--amber-dim); border-top:3px solid var(--amber); }
+
+.day-hdr { margin-bottom:1rem; }
+.day-wd  { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
+.day-d   { font-size:1.25rem; font-weight:300; color:var(--text); line-height:1.2; margin-top:.2rem; }
+.today-tag { display:inline-block; font-size:.6rem; font-weight:700; text-transform:uppercase;
+             background:var(--amber-dim); color:var(--amber); border-radius:4px;
+             padding:.1rem .4rem; margin-top:.3rem; letter-spacing:.06em; }
+
+.pr-row   { padding:.4rem 0; border-top:1px solid var(--border); }
+[data-theme="dark"] .pr-row { border-top-color:rgba(255,255,255,.04); }
+.pr-names { display:flex; align-items:baseline; gap:.35rem; margin-bottom:.2rem; }
+.pr-en    { font-size:.75rem; font-weight:500; color:var(--text); }
+.pr-ar    { font-family:var(--ar); font-size:.9rem; color:var(--muted); }
+.pr-time  { font-family:monospace; font-size:1rem; font-weight:600;
+            color:var(--amber); letter-spacing:.02em; display:block; }
+.pr-win   { font-family:monospace; font-size:.7rem; color:var(--muted); display:block; }
+
+/* ── URL section ─────────────────────────────────────────────────── */
+.url-sect { padding:2rem 1.5rem; max-width: 900px; margin: 0 auto; }
+.url-card { background:var(--surf); border:1px solid var(--border); border-radius:var(--r);
+            padding:1.25rem; margin-bottom:1rem; box-shadow:var(--shadow-sm); }
+[data-theme="dark"] .url-card { background:var(--surf2); }
+.url-lbl  { font-size:.75rem; color:var(--muted); text-transform:uppercase;
+            letter-spacing:.09em; margin-bottom:.65rem;
+            display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; font-weight:600;}
+.url-txt  { font-family:monospace; font-size:.85rem; color:var(--amber);
+            word-break:break-all; line-height:1.55;
+            background:var(--surf2); border-radius:6px; border: 1px solid var(--border);
+            padding:.65rem .85rem; margin-bottom:.85rem; }
+[data-theme="dark"] .url-txt { background:rgba(0,0,0,.25); }
+.url-acts { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+.cpfb { font-size:.8rem; color:var(--primary); opacity:0; transition:opacity .3s; font-weight: 500; }
+.cpfb.show { opacity:1; }
+.badge { display:inline-block; font-size:.66rem; font-weight:600; padding:.15rem .5rem;
+         border-radius:4px; letter-spacing:.04em; text-transform:uppercase; vertical-align:middle; }
+.b-ol { background:rgba(0,114,198,.10); color:#2A8BD4; border:1px solid rgba(0,114,198,.22); }
+.b-ap { background:rgba(50,180,100,.08); color:#28A060; border:1px solid rgba(50,180,100,.20); }
+.b-gc { background:rgba(220,70,55,.08);  color:#D04A40; border:1px solid rgba(220,70,55,.18); }
+[data-theme="dark"] .b-ol { background:rgba(0,114,198,.16); color:#5EB4FF; border-color:rgba(0,114,198,.28); }
+[data-theme="dark"] .b-ap { background:rgba(80,200,120,.12); color:#5DC880; border-color:rgba(80,200,120,.25); }
+[data-theme="dark"] .b-gc { background:rgba(234,67,53,.12);  color:#F07B74; border-color:rgba(234,67,53,.25); }
+
+.btn { display:inline-flex; align-items:center; gap:.4rem; padding:.6rem 1rem;
+       border-radius:var(--r); font-family:var(--font); font-size:.88rem; font-weight:500;
+       cursor:pointer; border:none; transition:all .15s; white-space:nowrap; text-decoration:none; }
+.btn-ghost { background:var(--surf2); border:1px solid var(--border); color:var(--muted); }
+.btn-ghost:hover { border-color:var(--primary); color:var(--primary); box-shadow: var(--shadow-sm); }
+.btn-prim  { background:var(--primary); color:#FFFFFF; font-weight:600; box-shadow: var(--shadow-sm); }
+.btn-prim:hover { background:var(--primary-lt); box-shadow: var(--shadow-md); transform:translateY(-1px); }
+
+.how-to { margin-top:2rem; font-size:.9rem; color:var(--muted); line-height:1.8;
+          background: var(--surf); padding: 1.5rem; border-radius: var(--r); border: 1px solid var(--border); }
+[data-theme="dark"] .how-to { background: var(--surf2); }
+.how-to strong { color:var(--text); display:block; margin-bottom:.5rem; font-size:.95rem;}
+.how-to ol { padding-left:1.5rem; }
+.how-to li { margin-bottom:.5rem; }
+
+/* ── Leaflet overrides ───────────────────────────────────────────── */
+.leaflet-control-zoom a { background:var(--surf)!important; color:var(--text)!important; border-color:var(--border)!important; }
+.leaflet-control-attribution { background:var(--map-attr-bg)!important; color:var(--muted)!important; font-size:10px!important; }
+.leaflet-control-attribution a { color:var(--muted)!important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════ */
+
+@media (max-width:1099px) and (min-width:769px) {
+  .prev-grid { grid-template-columns:repeat(7,minmax(80px,1fr)); overflow-x:auto; }
+}
+
+@media (max-width:768px) and (orientation:landscape) {
+  :root { --sb:260px; --hdr:44px; }
+  .app { height:calc(100vh - var(--hdr)); }
+  #map { height:calc(100vh - var(--hdr) - 45px); }
+  .map-tip { display:none; }
+  .prev-grid { grid-template-columns:repeat(7,minmax(72px,1fr)); overflow-x:auto; }
+  .sect-btn  { padding:.65rem 1rem; }
+  .sect-body { padding:.1rem .9rem .8rem; }
+  .tabs-hdr { padding: 0 .75rem; gap: 1rem; }
+}
+
+@media (max-width:768px) and (orientation:portrait), (max-width:500px) {
+  :root { --hdr:48px; }
+  .app {
+    display:flex;
+    flex-direction:column;
+    height:auto;
+    overflow:visible;
+  }
+  .main { order:1; overflow:visible; }
+  .sb   { order:2; overflow:visible; border-right:none; border-top:1px solid var(--border); }
+  #map { height:58vw; min-height:220px; max-height:380px; }
+  .sect-body.collapsed { display:none!important; }
+  .sect-body { padding:.1rem 1rem .9rem; }
+  .prev-grid { grid-template-columns:repeat(7,minmax(80px,1fr)); overflow-x:auto; }
+  .hdr-tag { display:none; }
+  .tabs-hdr { overflow-x: auto; white-space: nowrap; }
+}
+
+@media (max-width:380px) {
+  .brand-name { font-size:.82rem; }
+  .prev-grid { grid-template-columns:repeat(7,minmax(70px,1fr)); }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="brand">
+    <img src="icon.png" alt="SalahCalendar" class="brand-icon">
+    <span class="brand-name">SalahCalendar</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <span class="hdr-tag">Prayer Times Calendar</span>
+  <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button>
+</header>
+
+<!-- ── App layout ───────────────────────────────────────────────── -->
+<div class="app">
+
+  <!-- ══ LEFT SIDEBAR ══════════════════════════════════════════════ -->
+  <aside class="sb">
+    <div class="sb-scroll">
+
+      <!-- § Location -->
+      <div class="sect" id="sect-loc">
+        <button class="sect-btn" onclick="toggleSect('loc')">
+          <span class="sect-num">1</span>
+          <span class="sect-name">Location</span>
+          <span class="sect-meta" id="meta-loc">Not set</span>
+          <span class="sect-chev open" id="chev-loc">▾</span>
+        </button>
+        <div class="sect-body" id="body-loc">
+          <div class="geo-row">
+            <div class="search-wrap">
+              <span class="search-ic">⌕</span>
+              <input id="city-search" class="inp has-icon" type="search"
+                     placeholder="Search city or place…" autocomplete="off" spellcheck="false">
+              <div class="ac-list hidden" id="autocomplete"></div>
+            </div>
+            <button class="btn-geo" id="geo-btn" onclick="getMyLocation()">◎ My Location</button>
+          </div>
+          <div class="coord-wrap" id="coord-wrap">
+            <span class="c-pill" id="lat-pill">—</span>
+            <span class="c-pill" id="lng-pill">—</span>
+            <span class="c-name" id="loc-name"></span>
+          </div>
+          <p class="err-msg" id="geo-err" style="display:none"></p>
+        </div>
+      </div>
+
+      <!-- § Settings -->
+      <div class="sect" id="sect-set">
+        <button class="sect-btn" onclick="toggleSect('set')">
+          <span class="sect-num">2</span>
+          <span class="sect-name">Settings</span>
+          <span class="sect-meta" id="meta-set">MWL · 0 / 30 min</span>
+          <span class="sect-chev open" id="chev-set">▾</span>
+        </button>
+        <div class="sect-body" id="body-set">
+
+          <div class="field">
+            <label class="lbl" for="method">Calculation Method</label>
+            <select id="method" class="inp" onchange="onSettingsChange()">
+              <option value="MWL">Muslim World League — Fajr 18°, Isha 17°</option>
+              <option value="ISNA">ISNA (Islamic Society of North America) — Fajr 15°, Isha 15°</option>
+              <option value="Makkah">Umm Al-Qura University, Makkah — Fajr 18.5°, Isha 90 min</option>
+              <option value="Egypt">Egyptian General Authority — Fajr 19.5°, Isha 17.5°</option>
+              <option value="Karachi">Univ. of Islamic Sciences, Karachi — Fajr 18°, Isha 18°</option>
+              <option value="Tehran">University of Tehran — Fajr 17.7°, Isha 14°</option>
+              <option value="Algerian">Algerian Ministry — Fajr 18°, Isha 17°</option>
+              <option value="FranceAngle18">France - 18° Angle — Fajr 18°, Isha 18°</option>
+              <option value="FranceUOIFAngle12">France UOIF - 12° Angle — Fajr 12°, Isha 12°</option>
+              <option value="JAKIM">JAKIM (Malaysia) — Fajr 20°, Isha 18°</option>
+              <option value="Jordan">Jordan Ministry of Awqaf — Fajr 18°, Isha 18°</option>
+              <option value="KEMENAG">KEMENAG (Indonesia) — Fajr 20°, Isha 18°</option>
+              <option value="Kuwait">Kuwait — Fajr 18°, Isha 17.5°</option>
+              <option value="UIPTL" selected>London Unified Timetable — Fajr 12°, Isha 12°</option>
+              <option value="MUIS">MUIS (Singapore) — Fajr 20°, Isha 18°</option>
+              <option value="MoonSightingCommittee">Moon Sighting Committee — Fajr 18°, Isha 18°</option>
+              <option value="Habous">Moroccan Habous Ministry — Fajr 19.1°, Isha 17°</option>
+              <option value="Qatar">Qatar — Fajr 18°, Isha 90 min</option>
+              <option value="Dubai">UAE / Dubai — Fajr 18.2°, Isha 18.2°</option>
+              <option value="Tunusian">Tunisian Ministry — Fajr 18°, Isha 18°</option>
+              <option value="TurkiyeDiyanet">Türkiye Diyanet — Fajr 18°, Isha 17°</option>
+              <option value="Diyanet15Degrees">Turkish Diyanet 15° — Fajr 15°, Isha 15°</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="asr-m">Asr Juristic Method</label>
+            <select id="asr-m" class="inp" onchange="onSettingsChange()">
+              <option value="Standard" selected>Shafii / Standard (shadow factor 1)</option>
+              <option value="Hanafi">Hanafi (shadow factor 2)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="tz-in">Timezone</label>
+            <input id="tz-in" class="inp" type="text" placeholder="e.g. Europe/London" oninput="onSettingsChange()">
+            <span class="hint">IANA format — auto-detected from your browser</span>
+          </div>
+
+          <div class="field">
+            <label class="lbl">Prayers to Include</label>
+            <div class="prayer-grid">
+              <span class="p-check"><input type="checkbox" id="cb-imsak"           onchange="onSettingsChange()"><label for="cb-imsak">Imsak <span class="ar">الإمساك</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-fajr"    checked onchange="onSettingsChange()"><label for="cb-fajr">Fajr <span class="ar">الفجر</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-sunrise"         onchange="onSettingsChange()"><label for="cb-sunrise">Sunrise <span class="ar">الشروق</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-dhuhr"   checked onchange="onSettingsChange()"><label for="cb-dhuhr">Dhuhr <span class="ar">الظهر</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-asr"     checked onchange="onSettingsChange()"><label for="cb-asr">Asr <span class="ar">العصر</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-maghrib" checked onchange="onSettingsChange()"><label for="cb-maghrib">Maghrib <span class="ar">المغرب</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-isha"    checked onchange="onSettingsChange()"><label for="cb-isha">Isha <span class="ar">العشاء</span></label></span>
+              <span class="p-check"><input type="checkbox" id="cb-midnight"        onchange="onSettingsChange()"><label for="cb-midnight">Midnight <span class="ar">منتصف الليل</span></label></span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="lbl">Event starts before adhan</label>
+            <div class="slider-row">
+              <input type="range" id="sl-before" min="0" max="60" step="5" value="0" oninput="updSlider('before')">
+              <span class="sv" id="sv-before">0 min</span>
+            </div>
+            <span class="hint">Reminder window before the call to prayer</span>
+          </div>
+
+          <div class="field">
+            <label class="lbl">Event ends after adhan</label>
+            <div class="slider-row">
+              <input type="range" id="sl-after" min="5" max="120" step="5" value="15" oninput="updSlider('after')">
+              <span class="sv" id="sv-after">15 min</span>
+            </div>
+            <span class="hint">Prayer window duration after adhan</span>
+          </div>
+
+          <div class="days-row">
+            <div class="field">
+              <label class="lbl" for="d-before">Days before today</label>
+              <input type="number" id="d-before" class="inp" min="0" max="90" value="7" oninput="onSettingsChange()">
+            </div>
+            <div class="field">
+              <label class="lbl" for="d-after">Days ahead</label>
+              <input type="number" id="d-after" class="inp" min="1" max="365" value="28" oninput="onSettingsChange()">
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ══ RIGHT MAIN ══════════════════════════════════════════════ -->
+  <div class="main">
+    
+    <div class="tabs-hdr">
+      <button class="tab-btn active" onclick="switchTab('map')">Map</button>
+      <button class="tab-btn" onclick="switchTab('preview')">Preview</button>
+      <button class="tab-btn" onclick="switchTab('feed')">Calendar Feed</button>
+    </div>
+
+    <!-- Map Tab -->
+    <div class="tab-content active" id="tab-map">
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="map-tip">Click map · drag marker · or search city</div>
+      </div>
+    </div>
+
+    <!-- Preview Tab -->
+    <div class="tab-content" id="tab-preview">
+      <div class="prev-panel" id="prev-panel">
+        <div class="prev-topbar">
+          <span class="prev-title">Prayer Times Preview</span>
+          <div class="prev-nav">
+            <button class="nav-btn" onclick="shiftWk(-1)">← Prev</button>
+            <span class="prev-period" id="prev-period">—</span>
+            <button class="nav-btn" onclick="shiftWk(1)">Next →</button>
+          </div>
+        </div>
+        <div class="tz-bar">Times for timezone: <span id="tz-label">—</span></div>
+        <div class="prev-grid" id="prev-grid">
+           <div class="empty-state">Select a location to preview prayer times.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feed Tab -->
+    <div class="tab-content" id="tab-feed">
+      <div class="url-sect" id="url-sect">
+        <div id="feed-content" style="display:none;">
+          <div class="url-card">
+            <div class="url-lbl">📅 Subscribe URL <span class="badge b-ap">Apple Calendar</span> <span class="badge b-ol">Outlook for Mac</span></div>
+            <div class="url-txt" id="webcal-url">—</div>
+            <div class="url-acts">
+              <button class="btn btn-prim" id="sub-btn" onclick="doSubscribe()">Subscribe in Calendar</button>
+              <button class="btn btn-ghost" onclick="cpURL('webcal-url','cpfb1')">Copy Link</button>
+              <span class="cpfb" id="cpfb1">Copied!</span>
+            </div>
+          </div>
+          <div class="url-card">
+            <div class="url-lbl">🔗 HTTPS URL <span class="badge b-ol">Outlook Web/Desktop</span> <span class="badge b-gc">Google Calendar</span></div>
+            <div class="url-txt" id="https-url">—</div>
+            <div class="url-acts">
+              <button class="btn btn-ghost" onclick="cpURL('https-url','cpfb2')">Copy URL</button>
+              <a id="dl-ics" class="btn btn-ghost" href="#" download="prayer-times.ics">Download .ics</a>
+              <span class="cpfb" id="cpfb2">Copied!</span>
+            </div>
+          </div>
+          <div class="how-to">
+            <strong>How to subscribe:</strong>
+            <ol>
+              <li><strong>Outlook Web/Desktop:</strong> Calendar → Add calendar → Subscribe from web → paste HTTPS URL.</li>
+              <li><strong>Apple Calendar:</strong> Click <em>Subscribe in Calendar</em>, or File → New Calendar Subscription.</li>
+              <li><strong>Google Calendar:</strong> Other calendars → From URL → paste HTTPS URL.</li>
+            </ol>
+            <p style="margin-top:.8rem">The feed auto-refreshes every 12 hours, so times stay current automatically.</p>
+          </div>
+        </div>
+        <div id="feed-empty" class="empty-state">
+          Select a location to generate your calendar feed.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   Theme Toggle
+================================================================ */
+function getTheme(){ return localStorage.getItem('sc-theme')||'light'; }
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  const btn=document.getElementById('theme-toggle');
+  btn.textContent = t==='dark'?'☀️':'🌙';
+  btn.title = t==='dark'?'Switch to light theme':'Switch to dark theme';
+  if(typeof tileLayer!=='undefined'&&tileLayer){
+    const url = t==='dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    tileLayer.setUrl(url);
+  }
+}
+function toggleTheme(){
+  const cur=getTheme();
+  const next=cur==='dark'?'light':'dark';
+  localStorage.setItem('sc-theme',next);
+  applyTheme(next);
+}
+
+/* ================================================================
+   Tabs
+================================================================ */
+let activeTab = 'map';
+function switchTab(t){
+  activeTab = t;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.querySelector(`.tab-btn[onclick="switchTab('${t}')"]`).classList.add('active');
+  document.getElementById(`tab-${t}`).classList.add('active');
+  
+  if(t==='map' && map) {
+    setTimeout(()=>map.invalidateSize(), 50);
+  } else if (t==='preview') {
+    renderPrev();
+  } else if (t==='feed') {
+    renderFeed();
+  }
+}
+
+/* ================================================================
+   PrayTimes.js v2.3 — Inline port matching AzanClock engine
+================================================================ */
+const CM = {
+  Algerian:          {name:'Algerian Ministry of Religious Affairs',         params:{fajr:18,isha:17},                                     methodOffsets:{}},
+  Egypt:             {name:'Egyptian General Authority of Survey',            params:{fajr:19.5,isha:17.5},                                 methodOffsets:{}},
+  FranceAngle18:     {name:'France - 18° Angle',                             params:{fajr:18,isha:18},                                     methodOffsets:{}},
+  FranceUOIFAngle12: {name:'France UOIF - 12° Angle',                        params:{fajr:12,isha:12},                                     methodOffsets:{}},
+  ISNA:              {name:'ISNA (Islamic Society of North America)',         params:{fajr:15,isha:15},                                     methodOffsets:{}},
+  JAKIM:             {name:'Jabatan Kemajuan Islam Malaysia',                 params:{fajr:20,isha:18},                                     methodOffsets:{}},
+  Jordan:            {name:'Jordan Ministry of Awqaf',                        params:{fajr:18,isha:18},                                     methodOffsets:{maghrib:5}},
+  KEMENAG:           {name:'Kementrian Agama Indonesia',                      params:{fajr:20,isha:18},                                     methodOffsets:{}},
+  Kuwait:            {name:'Kuwait',                                          params:{fajr:18,isha:17.5},                                   methodOffsets:{}},
+  UIPTL:             {name:'London Unified Islamic Prayer Timetable',         params:{fajr:12,isha:12},                                     methodOffsets:{}},
+  MUIS:              {name:'Majlis Ugama Islam Singapura',                    params:{fajr:20,isha:18},                                     methodOffsets:{}},
+  MoonSightingCommittee:{name:'Moon Sighting Committee',                      params:{fajr:18,isha:18},                                     methodOffsets:{dhuhr:5,maghrib:3}},
+  Habous:            {name:'Moroccan Ministry of Habous and Islamic Affairs', params:{fajr:19.1,isha:17},                                   methodOffsets:{sunrise:-5,dhuhr:5,maghrib:5}},
+  MWL:               {name:'Muslim World League',                             params:{fajr:18,isha:17},                                     methodOffsets:{}},
+  Qatar:             {name:'Qatar',                                           params:{fajr:18,isha:'90 min'},                               methodOffsets:{}},
+  Karachi:           {name:'University of Islamic Sciences, Karachi',         params:{fajr:18,isha:18},                                     methodOffsets:{}},
+  Makkah:            {name:'Umm Al-Qura University, Makkah',                  params:{fajr:18.5,isha:'90 min'},                             methodOffsets:{}},
+  Dubai:             {name:'UAE / Dubai',                                     params:{fajr:18.2,isha:18.2},                                 methodOffsets:{}},
+  Tunusian:          {name:'Tunisian Ministry of Religious Affairs',          params:{fajr:18,isha:18},                                     methodOffsets:{}},
+  TurkiyeDiyanet:    {name:'Türkiye Diyanet İşleri Başkanlığı',               params:{fajr:18,isha:17},                                     methodOffsets:{sunrise:-7,fajr:-1,dhuhr:5,asr:5,maghrib:8,isha:1}},
+  Diyanet15Degrees:  {name:'Turkish Diyanet Offsets with 15° Angles',         params:{fajr:15,isha:15},                                     methodOffsets:{imsak:-1,sunrise:-9,dhuhr:5,asr:5,maghrib:7,isha:-1}},
+  Tehran:            {name:'University of Tehran',                            params:{fajr:17.7,isha:14,maghrib:5.5,midnight:'Jafari'},     methodOffsets:{}},
+};
+const defP={maghrib:'0 min',midnight:'Standard'};
+for(const k in CM){ for(const d in defP){ if(CM[k].params[d]===undefined) CM[k].params[d]=defP[d]; }}
+
+class PrayTimes {
+  constructor(method='MWL'){
+    this.setting={imsak:'10 min',dhuhr:'0 min',asr:'Standard',highLats:'AngleBased'};
+    this.offset={};
+    this.calcMethod='MWL';
+    const tn=['imsak','fajr','sunrise','dhuhr','asr','sunset','maghrib','isha'];
+    tn.forEach(n=>this.offset[n]=0);
+    this.setMethod(method);
+  }
+  setMethod(m){
+    if(!CM[m]) return;
+    this.calcMethod=m;
+    const p=CM[m].params;
+    for(const id in p) this.setting[id]=p[id];
+    const tn=['imsak','fajr','sunrise','dhuhr','asr','sunset','maghrib','isha'];
+    tn.forEach(n=>this.offset[n]=0);
+    const mo=CM[m].methodOffsets||{};
+    for(const k in mo) this.offset[k]=mo[k];
+  }
+  adjust(p){ for(const id in p) this.setting[id]=p[id]; }
+  tune(o){ for(const k in o) this.offset[k]=o[k]; }
+  getTimes(date,coords,tz,dst,fmt){
+    this.lat=1*coords[0]; this.lng=1*coords[1]; this.elv=coords[2]?1*coords[2]:0;
+    if(date.constructor===Date) date=[date.getFullYear(),date.getMonth()+1,date.getDate()];
+    this.timeZone=1*tz+(1*dst?1:0);
+    this.jDate=this.julian(date[0],date[1],date[2])-this.lng/(15*24);
+    return this.computeTimes();
+  }
+  computeTimes(){
+    let t={imsak:5,fajr:5,sunrise:6,dhuhr:12,asr:13,sunset:18,maghrib:18,isha:18};
+    t=this.computePrayerTimes(t); t=this.adjustTimes(t);
+    t.duha=t.sunrise+15/60; t.duhaend=t.dhuhr-10/60;
+    t=this.tuneTimes(t);
+    t.imsak+=((this.offset.fajr||0)/60);
+    t.duhaend+=((this.offset.dhuhr||0)/60);
+    t.midnight=t.maghrib+this.timeDiff(t.maghrib,t.fajr)/2;
+    return t;
+  }
+  computePrayerTimes(times){
+    times=this.dayPortion(times); const p=this.setting;
+    return {
+      imsak:this.sunAngleTime(this.ev(p.imsak),times.imsak,'ccw'),
+      fajr:this.sunAngleTime(this.ev(p.fajr),times.fajr,'ccw'),
+      sunrise:this.sunAngleTime(this.riseSetAngle(),times.sunrise,'ccw'),
+      dhuhr:this.midDay(times.dhuhr),
+      asr:this.asrTime(this.asrFactor(p.asr),times.asr),
+      sunset:this.sunAngleTime(this.riseSetAngle(),times.sunset),
+      maghrib:this.sunAngleTime(this.ev(p.maghrib),times.maghrib),
+      isha:this.sunAngleTime(this.ev(p.isha),times.isha),
+    };
+  }
+  adjustTimes(t){
+    const p=this.setting;
+    for(const k in t) t[k]+=this.timeZone-this.lng/15;
+    if(p.highLats!=='None') t=this.adjustHighLats(t);
+    if(this.isMin(p.imsak)) t.imsak=t.fajr-this.ev(p.imsak)/60;
+    if(this.isMin(p.maghrib)) t.maghrib=t.sunset+this.ev(p.maghrib)/60;
+    if(this.isMin(p.isha)) t.isha=t.maghrib+this.ev(p.isha)/60;
+    t.dhuhr+=this.ev(p.dhuhr)/60;
+    return t;
+  }
+  tuneTimes(t){ for(const k in t) if(this.offset[k]!==undefined) t[k]+=this.offset[k]/60; return t; }
+  adjustHighLats(t){
+    const p=this.setting, night=this.timeDiff(t.sunset,t.sunrise);
+    t.imsak=this.adjustHLTime(t.imsak,t.sunrise,this.ev(p.imsak),night,'ccw');
+    t.fajr=this.adjustHLTime(t.fajr,t.sunrise,this.ev(p.fajr),night,'ccw');
+    t.isha=this.adjustHLTime(t.isha,t.sunset,this.ev(p.isha),night);
+    t.maghrib=this.adjustHLTime(t.maghrib,t.sunset,this.ev(p.maghrib),night);
+    return t;
+  }
+  adjustHLTime(time,base,angle,night,dir){
+    const portion=this.nightPortion(angle,night);
+    const diff=(dir==='ccw')?this.timeDiff(time,base):this.timeDiff(base,time);
+    if(isNaN(time)||diff>portion) time=base+(dir==='ccw'?-portion:portion);
+    return time;
+  }
+  nightPortion(angle,night){
+    const m=this.setting.highLats; let p=0.5;
+    if(m==='AngleBased') p=1/60*angle; if(m==='OneSeventh') p=1/7;
+    return p*night;
+  }
+  asrFactor(a){ return{Standard:1,Hanafi:2}[a]||this.ev(a); }
+  asrTime(f,t){
+    const d=this.sunPosition(this.jDate+t).declination;
+    const angle=-DM.arccot(f+DM.tan(Math.abs(this.lat-d)));
+    return this.sunAngleTime(angle,t);
+  }
+  riseSetAngle(){ return 0.833+0.0347*Math.sqrt(this.elv); }
+  midDay(t){ return DM.fixHour(12-this.sunPosition(this.jDate+t).equation); }
+  sunAngleTime(angle,t,dir){
+    const d=this.sunPosition(this.jDate+t).declination, noon=this.midDay(t);
+    const v=1/15*DM.arccos((-DM.sin(angle)-DM.sin(d)*DM.sin(this.lat))/(DM.cos(d)*DM.cos(this.lat)));
+    return noon+(dir==='ccw'?-v:v);
+  }
+  sunPosition(jd){
+    const D=jd-2451545,g=DM.fixAngle(357.529+.98560028*D),q=DM.fixAngle(280.459+.98564736*D);
+    const L=DM.fixAngle(q+1.915*DM.sin(g)+.02*DM.sin(2*g)),e=23.439-3.6e-7*D;
+    const RA=DM.arctan2(DM.cos(e)*DM.sin(L),DM.cos(L))/15;
+    return{declination:DM.arcsin(DM.sin(e)*DM.sin(L)),equation:q/15-DM.fixHour(RA)};
+  }
+  julian(y,m,d){ if(m<=2){y--;m+=12;} const A=Math.floor(y/100),B=2-A+Math.floor(A/4); return Math.floor(365.25*(y+4716))+Math.floor(30.6001*(m+1))+d+B-1524.5; }
+  dayPortion(t){ for(const k in t) t[k]/=24; return t; }
+  timeDiff(a,b){ return DM.fixHour(b-a); }
+  ev(s){ return 1*(s+'').split(/[^0-9.+-]/)[0]; }
+  isMin(a){ return(a+'').indexOf('min')!==-1; }
+}
+const DM={
+  dtr(d){return d*Math.PI/180},rtd(r){return r*180/Math.PI},
+  sin(d){return Math.sin(this.dtr(d))},cos(d){return Math.cos(this.dtr(d))},tan(d){return Math.tan(this.dtr(d))},
+  arcsin(x){return this.rtd(Math.asin(x))},arccos(x){return this.rtd(Math.acos(x))},arctan(x){return this.rtd(Math.atan(x))},
+  arccot(x){return this.rtd(Math.atan(1/x))},arctan2(y,x){return this.rtd(Math.atan2(y,x))},
+  fixAngle(a){a=a-360*Math.floor(a/360);return a<0?a+360:a},
+  fixHour(a){a=a-24*Math.floor(a/24);return a<0?a+24:a},
+};
+
+/* ================================================================
+   App State & Settings
+================================================================ */
+const S = {
+  lat:null, lng:null, name:'',
+  tz: Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
+  prevWk:0
+};
+const PI = {
+  imsak:{key:'imsak',en:'Imsak',ar:'الإمساك'},
+  fajr:{key:'fajr',en:'Fajr',ar:'الفجر'},
+  sunrise:{key:'sunrise',en:'Sunrise',ar:'الشروق'},
+  dhuhr:{key:'dhuhr',en:'Dhuhr',ar:'الظهر'},
+  asr:{key:'asr',en:'Asr',ar:'العصر'},
+  maghrib:{key:'maghrib',en:'Maghrib',ar:'المغرب'},
+  isha:{key:'isha',en:'Isha',ar:'العشاء'},
+  midnight:{key:'midnight',en:'Midnight',ar:'منتصف الليل'},
+};
+
+function saveSettings() {
+  if(!S.lat || !S.lng) return;
+  const set = {
+    lat: S.lat, lng: S.lng, name: S.name, tz: document.getElementById('tz-in').value,
+    method: document.getElementById('method').value,
+    asr: document.getElementById('asr-m').value,
+    before: document.getElementById('sl-before').value,
+    after: document.getElementById('sl-after').value,
+    db: document.getElementById('d-before').value,
+    da: document.getElementById('d-after').value,
+    cb: Object.keys(PI).filter(p=>document.getElementById('cb-'+p)?.checked)
+  };
+  localStorage.setItem('sc-settings', JSON.stringify(set));
+}
+
+function loadSettings() {
+  try {
+    const txt = localStorage.getItem('sc-settings');
+    if(txt) {
+      const set = JSON.parse(txt);
+      if(set.lat) {
+        document.getElementById('tz-in').value = set.tz;
+        document.getElementById('method').value = set.method;
+        document.getElementById('asr-m').value = set.asr;
+        document.getElementById('sl-before').value = set.before;
+        document.getElementById('sl-after').value = set.after;
+        document.getElementById('d-before').value = set.db;
+        document.getElementById('d-after').value = set.da;
+        Object.keys(PI).forEach(p=>{
+          const el = document.getElementById('cb-'+p);
+          if(el) el.checked = set.cb.includes(p);
+        });
+        updSlider('before', false); updSlider('after', false);
+        setLoc(set.lat, set.lng, set.name, false);
+        return true;
+      }
+    }
+  } catch(e){}
+  return false;
+}
+
+async function initDefaultLoc() {
+  if (loadSettings()) return;
+  
+  // Try to geolocate by IP
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if(res.ok) {
+      const d = await res.json();
+      if(d.latitude && d.longitude) {
+        document.getElementById('tz-in').value = d.timezone || S.tz;
+        setLoc(d.latitude, d.longitude, d.city, true);
+        return;
+      }
+    }
+  } catch(e){}
+  
+  // Fallback to London Unified Timetable defaults
+  document.getElementById('tz-in').value = 'Europe/London';
+  setLoc(51.5074, -0.1278, 'London', true);
+}
+
+/* ================================================================
+   Map
+================================================================ */
+let map, marker, tileLayer;
+function initMap(){
+  map = L.map('map',{center:[51.5074,-0.1278],zoom:5});
+  const isDark = getTheme()==='dark';
+  const tileUrl = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  tileLayer = L.tileLayer(tileUrl,{
+    attribution:'© <a href="https://openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+    subdomains:'abcd', maxZoom:19,
+  }).addTo(map);
+  const icon = L.divIcon({className:'',
+    html:`<div style="width:16px;height:16px;background:#1B7A56;border:2.5px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4)"></div>`,
+    iconSize:[16,16], iconAnchor:[8,16],
+  });
+  marker = L.marker([51.5074,-0.1278],{draggable:true,icon}).addTo(map);
+  map.on('click', e=>{ setLoc(e.latlng.lat,e.latlng.lng,'',true); revGeo(e.latlng.lat,e.latlng.lng); });
+  marker.on('dragend',()=>{ const p=marker.getLatLng(); setLoc(p.lat,p.lng,'',true); revGeo(p.lat,p.lng); });
+}
+
+/* ================================================================
+   Location
+================================================================ */
+function setLoc(lat,lng,name,save=true){
+  S.lat=lat; S.lng=lng; if(name) S.name=name;
+  marker.setLatLng([lat,lng]);
+  map.setView([lat,lng],Math.max(map.getZoom(),10));
+  document.getElementById('lat-pill').textContent=`${lat.toFixed(5)}°`;
+  document.getElementById('lng-pill').textContent=`${lng.toFixed(5)}°`;
+  document.getElementById('coord-wrap').classList.add('show');
+  if(name){ document.getElementById('loc-name').textContent=name; document.getElementById('meta-loc').textContent=name; }
+  else { document.getElementById('meta-loc').textContent=`${lat.toFixed(3)}, ${lng.toFixed(3)}`; }
+  onSettingsChange(save);
+}
+async function revGeo(lat,lng){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,{headers:{'Accept-Language':'en'}});
+    const d=await r.json();
+    const n=d.address?.city||d.address?.town||d.address?.village||d.address?.county||'';
+    if(n){ S.name=n; document.getElementById('loc-name').textContent=n; document.getElementById('meta-loc').textContent=n; saveSettings(); }
+  }catch(e){}
+}
+function getMyLocation(){
+  const btn=document.getElementById('geo-btn'), err=document.getElementById('geo-err');
+  err.style.display='none';
+  if(!navigator.geolocation){ showErr(err,'Geolocation not supported.'); return; }
+  btn.textContent='…'; btn.disabled=true;
+  navigator.geolocation.getCurrentPosition(
+    p=>{ btn.textContent='◎ My Location'; btn.disabled=false; setLoc(p.coords.latitude,p.coords.longitude,'',true); revGeo(p.coords.latitude,p.coords.longitude); },
+    e=>{ btn.textContent='◎ My Location'; btn.disabled=false; showErr(err,'Could not get location: '+e.message); },
+    {timeout:10000}
+  );
+}
+function showErr(el,msg){ el.textContent=msg; el.style.display='block'; setTimeout(()=>el.style.display='none',4000); }
+
+/* ================================================================
+   City search
+================================================================ */
+let sTimer=null;
+document.getElementById('city-search').addEventListener('input',function(){
+  clearTimeout(sTimer); const q=this.value.trim();
+  if(q.length<3){hideAC();return;}
+  sTimer=setTimeout(()=>doSearch(q),380);
+});
+document.getElementById('city-search').addEventListener('keydown',e=>{ if(e.key==='Escape') hideAC(); });
+document.addEventListener('click',e=>{ if(!e.target.closest('.search-wrap')) hideAC(); });
+async function doSearch(q){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6`,{headers:{'Accept-Language':'en'}});
+    const rs=await r.json();
+    const ac=document.getElementById('autocomplete'); ac.innerHTML='';
+    if(!rs.length){hideAC();return;}
+    rs.forEach(res=>{
+      const el=document.createElement('div'); el.className='ac-item';
+      const nm=res.name||res.display_name.split(',')[0];
+      const dt=res.display_name.split(',').slice(1,3).join(',').trim();
+      el.innerHTML=`<div class="ac-name">${esc(nm)}</div><div class="ac-sub">${esc(dt)}</div>`;
+      el.onclick=()=>{ setLoc(parseFloat(res.lat),parseFloat(res.lon),nm,true); document.getElementById('city-search').value=nm; hideAC(); };
+      ac.appendChild(el);
+    });
+    ac.classList.remove('hidden');
+  }catch(e){hideAC();}
+}
+function hideAC(){ document.getElementById('autocomplete').classList.add('hidden'); }
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ================================================================
+   Sliders + settings
+================================================================ */
+function updSlider(w, save=true){
+  const v=parseInt(document.getElementById(`sl-${w}`).value);
+  document.getElementById(`sv-${w}`).textContent=v===0?'0 min':`${v} min`;
+  if(save) onSettingsChange(true);
+}
+function onSettingsChange(save=true){
+  const sel=document.getElementById('method');
+  const mn=sel.options[sel.selectedIndex].text.split('—')[0].trim();
+  const b=document.getElementById('sl-before').value, a=document.getElementById('sl-after').value;
+  document.getElementById('meta-set').textContent=`${mn} · ${b}/${a} min`;
+  if(activeTab==='preview') renderPrev();
+  if(activeTab==='feed') renderFeed();
+  if(save) saveSettings();
+}
+
+/* ================================================================
+   Section toggle
+================================================================ */
+function toggleSect(id){
+  const mob=window.innerWidth<=768&&window.innerHeight>window.innerWidth;
+  const land=window.innerWidth<=768&&window.innerWidth>window.innerHeight;
+  if(!mob&&!land) return;
+  const body=document.getElementById(`body-${id}`);
+  const chev=document.getElementById(`chev-${id}`);
+  body.classList.toggle('collapsed');
+  chev.classList.toggle('open');
+}
+
+/* ================================================================
+   TZ offset helper
+================================================================ */
+function getTzOff(tz,y,m,d){
+  try{
+    const u=new Date(Date.UTC(y,m-1,d,12,0,0));
+    const s=new Intl.DateTimeFormat('en-US',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).format(u);
+    const [h,mi]=s.split(':').map(Number);
+    let o=(h+mi/60)-12; if(o<-13)o+=24; if(o>14)o-=24; return o;
+  }catch(e){ return -(new Date().getTimezoneOffset())/60; }
+}
+
+/* ================================================================
+   Formatting
+================================================================ */
+function fmtFH(fh){ const t=((Math.round(fh*60)%1440)+1440)%1440; return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; }
+function fmtMn(mn){ const t=((Math.round(mn)%1440)+1440)%1440; return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; }
+
+/* ================================================================
+   Preview
+================================================================ */
+function shiftWk(d){ S.prevWk+=d; renderPrev(); }
+function renderPrev(){
+  const grid=document.getElementById('prev-grid');
+  if(!S.lat||!S.lng){ grid.innerHTML='<div class="empty-state">Select a location to preview prayer times.</div>'; return; }
+  
+  const tz=document.getElementById('tz-in').value.trim()||S.tz;
+  const method=document.getElementById('method').value;
+  const asr=document.getElementById('asr-m').value;
+  const before=parseInt(document.getElementById('sl-before').value);
+  const after=parseInt(document.getElementById('sl-after').value);
+  const keys=Object.keys(PI).filter(p=>{ const c=document.getElementById(`cb-${p}`); return c&&c.checked; });
+  document.getElementById('tz-label').textContent=tz;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const dow=today.getDay(), monOff=dow===0?-6:1-dow;
+  const ws=new Date(today); ws.setDate(today.getDate()+monOff+S.prevWk*7);
+  const we=new Date(ws); we.setDate(ws.getDate()+6);
+  const fd=dt=>dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  document.getElementById('prev-period').textContent=`${fd(ws)} – ${fd(we)} ${we.getFullYear()}`;
+  const calc=new PrayTimes(method); calc.adjust({asr:asr});
+  grid.innerHTML='';
+  
+  const todayStr=today.toDateString();
+  for(let i=0;i<7;i++){
+    const dt=new Date(ws); dt.setDate(ws.getDate()+i);
+    const y=dt.getFullYear(),mo=dt.getMonth()+1,d=dt.getDate();
+    const isToday=dt.toDateString()===todayStr;
+    const off=getTzOff(tz,y,mo,d);
+    const times=calc.getTimes([y,mo,d],[S.lat,S.lng,0],off,0,'Float');
+    const el=document.createElement('div');
+    el.className='p-day'+(isToday?' today':'');
+    el.innerHTML=`<div class="day-hdr">
+      <div class="day-wd">${dt.toLocaleDateString('en-GB',{weekday:'short'})}</div>
+      <div class="day-d">${d} ${dt.toLocaleDateString('en-GB',{month:'short'})}</div>
+      ${isToday?'<div class="today-tag">Today</div>':''}
+    </div>`;
+    keys.forEach(k=>{
+      const p=PI[k]; const ft=times[p.key]; if(!isFinite(ft)) return;
+      const am=ft*60, sm=am-before, em=am+after;
+      const row=document.createElement('div'); row.className='pr-row';
+      row.innerHTML=`<div class="pr-names"><span class="pr-en">${p.en}</span><span class="pr-ar">${p.ar}</span></div>
+        <span class="pr-time">${fmtFH(ft)}</span>
+        <span class="pr-win">${fmtMn(sm)} – ${fmtMn(em)}</span>`;
+      el.appendChild(row);
+    });
+    grid.appendChild(el);
+  }
+}
+
+/* ================================================================
+   Generate feed URL
+================================================================ */
+function renderFeed(){
+  const content = document.getElementById('feed-content');
+  const empty = document.getElementById('feed-empty');
+  
+  if(!S.lat||!S.lng){
+    content.style.display = 'none';
+    empty.style.display = 'flex';
+    return;
+  }
+  
+  const tz=document.getElementById('tz-in').value.trim()||S.tz;
+  const method=document.getElementById('method').value;
+  const asr=document.getElementById('asr-m').value;
+  const before=document.getElementById('sl-before').value;
+  const after=document.getElementById('sl-after').value;
+  const db=Math.max(0,parseInt(document.getElementById('d-before').value)||0);
+  const da=Math.max(1,parseInt(document.getElementById('d-after').value)||60);
+  const prayers=Object.keys(PI).filter(p=>{ const c=document.getElementById(`cb-${p}`); return c&&c.checked; });
+  
+  if(!prayers.length){
+    content.style.display = 'none';
+    empty.textContent = 'Select at least one prayer.';
+    empty.style.display = 'flex';
+    return;
+  }
+
+  content.style.display = 'block';
+  empty.style.display = 'none';
+
+  const p=new URLSearchParams({lat:S.lat.toFixed(6),lng:S.lng.toFixed(6),method,asr,before,after,hours_before:db*24,hours_after:da*24,tz,prayers:prayers.join(','),location:S.name||''});
+  const base='https://prayer.hablullah.app/prayer.php';
+  const httpsURL=`${base}?${p}`;
+  const webcalURL=httpsURL.replace('https://','webcal://');
+  
+  document.getElementById('https-url').textContent=httpsURL;
+  document.getElementById('webcal-url').textContent=webcalURL;
+  document.getElementById('dl-ics').href=httpsURL;
+  document.getElementById('sub-btn').dataset.url=webcalURL;
+}
+function doSubscribe(){ const u=document.getElementById('sub-btn').dataset.url; if(u) window.location.href=u; }
+async function cpURL(sid,fbid){
+  const txt=document.getElementById(sid).textContent;
+  try{ await navigator.clipboard.writeText(txt); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+  const fb=document.getElementById(fbid); fb.classList.add('show'); setTimeout(()=>fb.classList.remove('show'),2200);
+}
+
+/* ================================================================
+   Init
+================================================================ */
+document.addEventListener('DOMContentLoaded',()=>{
+  applyTheme(getTheme());
+  initMap();
+  
+  document.getElementById('tz-in').value=S.tz;
+  updSlider('before', false); updSlider('after', false);
+  
+  const isPortrait=()=>window.innerHeight>window.innerWidth;
+  const isMobile=()=>window.innerWidth<=768;
+  if(isMobile()&&isPortrait()){
+    document.getElementById('body-set').classList.add('collapsed');
+    document.getElementById('chev-set').classList.remove('open');
+  }
+  window.addEventListener('resize',()=>{ if(activeTab==='map') map.invalidateSize(); });
+
+  // Load saved settings or fallback to IP / London
+  initDefaultLoc();
+});
+</script>
+</body>
+</html>
