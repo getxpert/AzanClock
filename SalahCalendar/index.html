@@ -455,7 +455,7 @@ select.inp {
     <span class="brand-name">SalahCalendar</span>
   </div>
   <div class="hdr-sep"></div>
-  <span class="hdr-tag">Prayer Times Calendar</span>
+  <img src="hablullah2.png" alt="Hablullah" class="hdr-tag" style="height: 30px; border: none; padding: 0; border-radius: 0;">
   <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button>
 </header>
 
@@ -930,6 +930,7 @@ async function initDefaultLoc() {
       if(d.latitude && d.longitude) {
         document.getElementById('tz-in').value = d.timezone || S.tz;
         setLoc(d.latitude, d.longitude, d.city, true);
+        autoMethodByLocation(d.country_name || d.city || '');
         return;
       }
     }
@@ -938,6 +939,7 @@ async function initDefaultLoc() {
   // Fallback to London Unified Timetable defaults
   document.getElementById('tz-in').value = 'Europe/London';
   setLoc(51.5074, -0.1278, 'London', true);
+  autoMethodByLocation('London');
 }
 
 /* ================================================================
@@ -983,7 +985,37 @@ async function revGeo(lat,lng){
     const d=await r.json();
     const n=d.address?.city||d.address?.town||d.address?.village||d.address?.county||'';
     if(n){ S.name=n; document.getElementById('loc-name').textContent=n; document.getElementById('meta-loc').textContent=n; saveSettings(); }
+    autoMethodByLocation(d.display_name || d.address?.country || '');
   }catch(e){}
+}
+
+function autoMethodByLocation(locString) {
+  if (!locString) return;
+  let method = 'MWL';
+  if (/\b(pakistan|lahore|karachi|islamabad)\b/i.test(locString)) method = 'Karachi';
+  else if (/\b(egypt|cairo)\b/i.test(locString)) method = 'Egypt';
+  else if (/\b(makkah|saudi arabia|riyadh|jeddah)\b/i.test(locString)) method = 'Makkah';
+  else if (/\b(dubai|uae|united arab emirates|abu dhabi)\b/i.test(locString)) method = 'Dubai';
+  else if (/\b(qatar|doha)\b/i.test(locString)) method = 'Qatar';
+  else if (/\b(kuwait)\b/i.test(locString)) method = 'Kuwait';
+  else if (/\b(jordan|amman)\b/i.test(locString)) method = 'Jordan';
+  else if (/\b(malaysia|kuala lumpur)\b/i.test(locString)) method = 'JAKIM';
+  else if (/\b(indonesia|jakarta)\b/i.test(locString)) method = 'KEMENAG';
+  else if (/\b(singapore)\b/i.test(locString)) method = 'MUIS';
+  else if (/\b(morocco|casablanca|rabat)\b/i.test(locString)) method = 'Habous';
+  else if (/\b(tunisia|tunis)\b/i.test(locString)) method = 'Tunusian';
+  else if (/\b(algeria|algiers)\b/i.test(locString)) method = 'Algerian';
+  else if (/\b(turkey|türkiye|istanbul|ankara)\b/i.test(locString)) method = 'TurkiyeDiyanet';
+  else if (/\b(iran|tehran)\b/i.test(locString)) method = 'Tehran';
+  else if (/\b(france|paris)\b/i.test(locString)) method = 'FranceAngle18';
+  else if (/\b(uk|united kingdom|london|england|great britain)\b/i.test(locString)) method = 'UIPTL';
+  else if (/\b(usa|united states|america|canada|new york|washington|toronto)\b/i.test(locString)) method = 'ISNA';
+  
+  const methodEl = document.getElementById('method');
+  if (methodEl.value !== method) {
+    methodEl.value = method;
+    onSettingsChange(true);
+  }
 }
 function getMyLocation(){
   const btn=document.getElementById('geo-btn'), err=document.getElementById('geo-err');
@@ -1020,7 +1052,7 @@ async function doSearch(q){
       const nm=res.name||res.display_name.split(',')[0];
       const dt=res.display_name.split(',').slice(1,3).join(',').trim();
       el.innerHTML=`<div class="ac-name">${esc(nm)}</div><div class="ac-sub">${esc(dt)}</div>`;
-      el.onclick=()=>{ setLoc(parseFloat(res.lat),parseFloat(res.lon),nm,true); document.getElementById('city-search').value=nm; hideAC(); };
+      el.onclick=()=>{ setLoc(parseFloat(res.lat),parseFloat(res.lon),nm,true); document.getElementById('city-search').value=nm; autoMethodByLocation(res.display_name); hideAC(); };
       ac.appendChild(el);
     });
     ac.classList.remove('hidden');
