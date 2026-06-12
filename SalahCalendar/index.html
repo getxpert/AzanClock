@@ -444,6 +444,144 @@ select.inp {
   .brand-name { font-size:.82rem; }
   .prev-grid { grid-template-columns:repeat(7,minmax(70px,1fr)); }
 }
+/* ── Feed Mode Toggle ────────────────────────────────────────────── */
+.feed-toggle { display:flex; gap:.5rem; margin-bottom:1.5rem; background:var(--surf2); border-radius:var(--r); padding:4px; border:1px solid var(--border); }
+.feed-toggle label {
+  flex:1; text-align:center; padding:.7rem 1rem; border-radius:calc(var(--r) - 2px);
+  cursor:pointer; font-size:.88rem; font-weight:500; color:var(--muted);
+  transition:all .2s; user-select:none; display:flex; align-items:center; justify-content:center; gap:.4rem;
+}
+.feed-toggle input { display:none; }
+.feed-toggle input:checked + span {
+  background:var(--primary); color:#fff; border-radius:calc(var(--r) - 2px);
+  box-shadow:var(--shadow-sm); padding:.7rem 1rem; margin:-.7rem -1rem;
+}
+.feed-toggle label:has(input:checked) {
+  color:#fff; background:var(--primary); box-shadow:var(--shadow-sm);
+}
+
+/* ── Dynamic Form ───────────────────────────────────────────────── */
+.dyn-form { display:flex; flex-direction:column; gap:1rem; }
+.dyn-form .field { display:flex; flex-direction:column; gap:.3rem; }
+.dyn-form .field-row { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+.dyn-form .lbl { font-size:.78rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+.dyn-form .lbl .req { color:var(--danger); }
+.dyn-form .inp {
+  padding:.6rem .85rem; border-radius:var(--r); border:1px solid var(--border);
+  background:var(--inp-bg); color:var(--text); font-family:var(--font); font-size:.9rem;
+  transition:border-color .2s, box-shadow .2s; outline:none;
+}
+.dyn-form .inp:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-dim); }
+.dyn-form .inp[readonly] { background:var(--surf2); color:var(--muted); cursor:default; }
+.dyn-form .inp.error { border-color:var(--danger); }
+.dyn-form .hint { font-size:.75rem; color:var(--muted); }
+
+.dyn-submit {
+  display:inline-flex; align-items:center; justify-content:center; gap:.5rem;
+  padding:.75rem 1.5rem; border-radius:var(--r); border:none;
+  background:var(--primary); color:#fff; font-family:var(--font);
+  font-size:.95rem; font-weight:600; cursor:pointer;
+  transition:all .2s; box-shadow:var(--shadow-sm);
+}
+.dyn-submit:hover { background:var(--primary-lt); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+.dyn-submit:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+.dyn-submit .spinner {
+  width:16px; height:16px; border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; display:none;
+}
+.dyn-submit.loading .spinner { display:inline-block; }
+.dyn-submit.loading .btn-text { display:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Success Card ───────────────────────────────────────────────── */
+.success-card {
+  background:var(--info-dim); border:1px solid rgba(27,122,86,.25);
+  border-radius:var(--r); padding:1.25rem; margin-top:1rem;
+  animation:fadeIn .3s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.success-card .sc-title {
+  font-size:.95rem; font-weight:600; color:var(--info-text);
+  display:flex; align-items:center; gap:.4rem; margin-bottom:.75rem;
+}
+.success-card .sc-link {
+  font-family:monospace; font-size:.82rem; color:var(--amber);
+  background:var(--surf2); border:1px solid var(--border); border-radius:6px;
+  padding:.55rem .75rem; word-break:break-all; margin-bottom:.75rem; line-height:1.5;
+}
+.success-card .sc-actions { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+
+/* ── Static Warning ─────────────────────────────────────────────── */
+.static-warning {
+  background:rgba(192,139,24,.08); border:1px solid rgba(192,139,24,.25);
+  border-radius:var(--r); padding:1rem 1.25rem; margin-top:1rem;
+  display:flex; gap:.6rem; align-items:flex-start;
+}
+[data-theme="dark"] .static-warning { background:rgba(212,160,32,.08); border-color:rgba(212,160,32,.2); }
+.static-warning .sw-icon { font-size:1.2rem; flex-shrink:0; line-height:1.4; }
+.static-warning .sw-text { font-size:.84rem; color:var(--muted); line-height:1.6; }
+.static-warning .sw-text strong { color:var(--text); }
+
+/* ── OTP Modal ──────────────────────────────────────────────────── */
+.otp-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center; z-index:9999;
+  animation:fadeIn .2s ease;
+}
+[data-theme="dark"] .otp-overlay { background:rgba(0,0,0,.7); }
+.otp-modal {
+  background:var(--surf); border:1px solid var(--border); border-radius:var(--rlg);
+  padding:2rem; max-width:420px; width:90%; box-shadow:var(--shadow-lg);
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.otp-modal h3 { font-size:1.15rem; font-weight:600; color:var(--text); margin:0 0 .5rem; display:flex; align-items:center; gap:.5rem; }
+.otp-modal .otp-desc { font-size:.88rem; color:var(--muted); line-height:1.6; margin-bottom:1.25rem; }
+.otp-modal .otp-desc strong { color:var(--primary); }
+.otp-modal .otp-email-note {
+  background:var(--info-dim); border-radius:8px; padding:.6rem .85rem;
+  font-size:.82rem; color:var(--info-text); margin-bottom:1rem; line-height:1.5;
+}
+.otp-input-row { display:flex; gap:.5rem; margin-bottom:1rem; }
+.otp-input {
+  flex:1; padding:.7rem 1rem; border-radius:var(--r); border:1px solid var(--border);
+  background:var(--inp-bg); color:var(--text); font-family:monospace;
+  font-size:1.2rem; letter-spacing:4px; text-align:center; outline:none;
+  transition:border-color .2s;
+}
+.otp-input:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-dim); }
+.otp-verify-btn {
+  padding:.7rem 1.5rem; border-radius:var(--r); border:none;
+  background:var(--primary); color:#fff; font-family:var(--font);
+  font-size:.9rem; font-weight:600; cursor:pointer; transition:all .15s;
+}
+.otp-verify-btn:hover { background:var(--primary-lt); }
+.otp-verify-btn:disabled { opacity:.5; cursor:not-allowed; }
+.otp-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.5rem; }
+.otp-countdown { font-size:.82rem; color:var(--muted); }
+.otp-countdown span { color:var(--amber); font-weight:600; font-family:monospace; }
+.otp-resend {
+  background:none; border:none; color:var(--primary); font-family:var(--font);
+  font-size:.82rem; font-weight:500; cursor:pointer; text-decoration:underline;
+  padding:0;
+}
+.otp-resend:disabled { color:var(--muted); text-decoration:none; cursor:not-allowed; }
+.otp-close {
+  position:absolute; top:1rem; right:1rem; background:none; border:none;
+  color:var(--muted); font-size:1.2rem; cursor:pointer; padding:.25rem;
+}
+.otp-error { color:var(--danger); font-size:.82rem; margin-bottom:.75rem; display:none; }
+
+/* ── Login prompt card ──────────────────────────────────────────── */
+.login-prompt {
+  background:var(--info-dim); border:1px solid rgba(27,122,86,.2);
+  border-radius:var(--r); padding:1.25rem; margin-bottom:1.25rem;
+  animation:fadeIn .3s ease;
+}
+.login-prompt .lp-title { font-size:.95rem; font-weight:600; color:var(--info-text); margin-bottom:.5rem; display:flex; align-items:center; gap:.4rem; }
+.login-prompt .lp-desc { font-size:.84rem; color:var(--muted); line-height:1.6; margin-bottom:.75rem; }
+.login-prompt .lp-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
+
 </style>
 </head>
 <body>
@@ -632,7 +770,81 @@ select.inp {
     <!-- Feed Tab -->
     <div class="tab-content" id="tab-feed">
       <div class="url-sect" id="url-sect">
-        <div id="feed-content" style="display:none;">
+
+        <!-- Feed mode toggle -->
+        <div class="feed-toggle" id="feed-toggle" style="display:none;">
+          <label onclick="switchFeedMode('dynamic')">
+            <input type="radio" name="feed-mode" value="dynamic" checked>
+            <span>🔗 Dynamic Link</span>
+          </label>
+          <label onclick="switchFeedMode('static')">
+            <input type="radio" name="feed-mode" value="static">
+            <span>📋 Static Link</span>
+          </label>
+        </div>
+
+        <!-- ═══ DYNAMIC LINK SECTION ═══ -->
+        <div id="feed-dynamic" style="display:none;">
+
+          <!-- Login prompt (shown when cid exists but not authenticated) -->
+          <div id="login-prompt" class="login-prompt" style="display:none;">
+            <div class="lp-title">🔐 Calendar Already Exists</div>
+            <div class="lp-desc" id="login-prompt-desc">This calendar is owned by another account. To modify its settings, please verify your identity.</div>
+            <div class="lp-actions">
+              <button class="btn btn-prim" onclick="sendOTPForLogin()">Send Verification Code</button>
+              <button class="btn btn-ghost" onclick="resetToNewCalendar()">Create New Calendar Instead</button>
+            </div>
+          </div>
+
+          <!-- Registration / Edit form -->
+          <div id="dyn-form-wrap">
+            <div class="url-card">
+              <div class="url-lbl">📧 Calendar Registration</div>
+              <form class="dyn-form" id="dyn-form" onsubmit="return submitDynamicCalendar(event)">
+                <div class="field">
+                  <label class="lbl" for="dyn-email">Email Address <span class="req">*</span></label>
+                  <input id="dyn-email" class="inp" type="email" placeholder="your@email.com" required autocomplete="email">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="dyn-calkey">Calendar Key</label>
+                  <input id="dyn-calkey" class="inp" type="text" readonly>
+                  <span class="hint">Auto-generated unique identifier for your calendar</span>
+                </div>
+                <div class="field-row">
+                  <div class="field">
+                    <label class="lbl" for="dyn-name">Name <span style="color:var(--muted);font-weight:400;text-transform:none;">(optional)</span></label>
+                    <input id="dyn-name" class="inp" type="text" placeholder="Your name" autocomplete="name">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="dyn-phone">Phone <span style="color:var(--muted);font-weight:400;text-transform:none;">(optional)</span></label>
+                    <input id="dyn-phone" class="inp" type="tel" placeholder="+44 ..." autocomplete="tel">
+                  </div>
+                </div>
+                <div class="field-row">
+                  <div class="field">
+                    <label class="lbl" for="dyn-city">City</label>
+                    <input id="dyn-city" class="inp" type="text" readonly>
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="dyn-country">Country</label>
+                    <input id="dyn-country" class="inp" type="text" readonly>
+                  </div>
+                </div>
+                <button type="submit" class="dyn-submit" id="dyn-submit-btn">
+                  <span class="btn-text">📨 Generate & Send Link</span>
+                  <span class="spinner"></span>
+                </button>
+                <p class="err-msg" id="dyn-error"></p>
+              </form>
+            </div>
+
+            <!-- Success card (shown after registration) -->
+            <div id="dyn-success" style="display:none;"></div>
+          </div>
+        </div>
+
+        <!-- ═══ STATIC LINK SECTION ═══ -->
+        <div id="feed-static" style="display:none;">
           <div class="url-card">
             <div class="url-lbl">📅 Subscribe URL <span class="badge b-ap">Apple Calendar</span> <span class="badge b-ol">Outlook for Mac</span></div>
             <div class="url-txt" id="webcal-url">—</div>
@@ -651,6 +863,18 @@ select.inp {
               <span class="cpfb" id="cpfb2">Copied!</span>
             </div>
           </div>
+
+          <!-- Static link warning -->
+          <div class="static-warning">
+            <span class="sw-icon">⚠️</span>
+            <div class="sw-text">
+              <strong>Important:</strong> This static link's behaviour cannot be modified later.
+              Any modification to prayer settings will result in <strong>unsubscribing the old link</strong>
+              and <strong>resubscribing to the new modified link</strong> in your calendar app.
+              For a modifiable calendar, use the <em>Dynamic Link</em> option above.
+            </div>
+          </div>
+
           <div class="how-to">
             <strong>How to subscribe:</strong>
             <ol>
@@ -661,8 +885,32 @@ select.inp {
             <p style="margin-top:.8rem">The feed auto-refreshes every 12 hours, so times stay current automatically.</p>
           </div>
         </div>
+
         <div id="feed-empty" class="empty-state">
           Select a location to generate your calendar feed.
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ OTP MODAL ═══ -->
+    <div id="otp-overlay" class="otp-overlay" style="display:none;">
+      <div class="otp-modal" style="position:relative;">
+        <button class="otp-close" onclick="closeOTPModal()" title="Close">✕</button>
+        <h3>🔐 Verify Your Identity</h3>
+        <p class="otp-desc" id="otp-desc">
+          An OTP has been sent to <strong id="otp-masked-email">—</strong> (calendar owner's email).
+        </p>
+        <div class="otp-email-note">
+          📬 Please check your <strong>inbox</strong> and <strong>spam/junk folder</strong>. The code may take a moment to arrive.
+        </div>
+        <p class="otp-error" id="otp-error"></p>
+        <div class="otp-input-row">
+          <input class="otp-input" id="otp-code" type="text" maxlength="6" placeholder="000000" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+          <button class="otp-verify-btn" id="otp-verify-btn" onclick="verifyOTP()">Verify</button>
+        </div>
+        <div class="otp-footer">
+          <span class="otp-countdown" id="otp-countdown">Expires in: <span id="otp-timer">10:00</span></span>
+          <button class="otp-resend" id="otp-resend-btn" onclick="resendOTP()" disabled>Resend OTP</button>
         </div>
       </div>
     </div>
@@ -863,7 +1111,7 @@ const DM={
    App State & Settings
 ================================================================ */
 const S = {
-  lat:null, lng:null, name:'',
+  lat:null, lng:null, name:'', city:'', country:'',
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
   prevWk:0
 };
@@ -929,6 +1177,8 @@ async function initDefaultLoc() {
       const d = await res.json();
       if(d.latitude && d.longitude) {
         document.getElementById('tz-in').value = d.timezone || S.tz;
+        S.city = d.city || '';
+        S.country = d.country_name || '';
         setLoc(d.latitude, d.longitude, d.city, true);
         autoMethodByLocation(d.country_name || d.city || '');
         return;
@@ -985,6 +1235,8 @@ async function revGeo(lat,lng){
     const d=await r.json();
     const n=d.address?.city||d.address?.town||d.address?.village||d.address?.county||'';
     if(n){ S.name=n; document.getElementById('loc-name').textContent=n; document.getElementById('meta-loc').textContent=n; saveSettings(); }
+    S.city = d.address?.city || d.address?.town || d.address?.village || '';
+    S.country = d.address?.country || '';
     autoMethodByLocation(d.display_name || d.address?.country || '');
   }catch(e){}
 }
@@ -1051,8 +1303,9 @@ async function doSearch(q){
       const el=document.createElement('div'); el.className='ac-item';
       const nm=res.name||res.display_name.split(',')[0];
       const dt=res.display_name.split(',').slice(1,3).join(',').trim();
+      const dnParts=res.display_name.split(',').map(s=>s.trim());
       el.innerHTML=`<div class="ac-name">${esc(nm)}</div><div class="ac-sub">${esc(dt)}</div>`;
-      el.onclick=()=>{ setLoc(parseFloat(res.lat),parseFloat(res.lon),nm,true); document.getElementById('city-search').value=nm; autoMethodByLocation(res.display_name); hideAC(); };
+      el.onclick=()=>{ setLoc(parseFloat(res.lat),parseFloat(res.lon),nm,true); document.getElementById('city-search').value=nm; S.city=nm; S.country=dnParts.length>1?dnParts[dnParts.length-1]:''; autoMethodByLocation(res.display_name); hideAC(); };
       ac.appendChild(el);
     });
     ac.classList.remove('hidden');
@@ -1162,75 +1415,504 @@ function renderPrev(){
 }
 
 /* ================================================================
-   Generate feed URL
+   Feed — State & Config
 ================================================================ */
-function renderFeed(){
-  const content = document.getElementById('feed-content');
+const API_BASE = window.location.href.replace('index.html','').replace(/\/$/,'') + '/calendar_api.php';
+let currentFeedMode = 'dynamic';  // 'dynamic' or 'static'
+let currentCalendarKey = '';      // loaded from URL ?cid= or generated
+let isAuthenticated = false;
+let authenticatedEmail = '';
+let otpCountdownInterval = null;
+let otpResendCooldown = null;
+
+function generateCalendarKey() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let key = '';
+  const arr = new Uint8Array(8);
+  crypto.getRandomValues(arr);
+  arr.forEach(b => key += chars[b % chars.length]);
+  return key;
+}
+
+function gatherCalendarParams() {
+  const tz = document.getElementById('tz-in').value.trim() || S.tz;
+  const method = document.getElementById('method').value;
+  const asr = document.getElementById('asr-m').value;
+  const before = document.getElementById('sl-before').value;
+  const after = document.getElementById('sl-after').value;
+  const db = Math.max(0, parseInt(document.getElementById('d-before').value) || 0);
+  const da = Math.max(1, parseInt(document.getElementById('d-after').value) || 60);
+  const prayers = Object.keys(PI).filter(p => { const c = document.getElementById(`cb-${p}`); return c && c.checked; });
+  return {
+    lat: S.lat ? S.lat.toFixed(6) : '',
+    lng: S.lng ? S.lng.toFixed(6) : '',
+    method, asr, before, after,
+    hours_before: db * 24,
+    hours_after: da * 24,
+    tz,
+    prayers: prayers.join(','),
+    location: S.name || ''
+  };
+}
+
+/* ================================================================
+   Feed — Render
+================================================================ */
+function renderFeed() {
+  const toggle = document.getElementById('feed-toggle');
+  const dynSect = document.getElementById('feed-dynamic');
+  const staticSect = document.getElementById('feed-static');
   const empty = document.getElementById('feed-empty');
-  
-  if(!S.lat||!S.lng){
-    content.style.display = 'none';
+
+  if (!S.lat || !S.lng) {
+    toggle.style.display = 'none';
+    dynSect.style.display = 'none';
+    staticSect.style.display = 'none';
     empty.style.display = 'flex';
     return;
   }
-  
-  const tz=document.getElementById('tz-in').value.trim()||S.tz;
-  const method=document.getElementById('method').value;
-  const asr=document.getElementById('asr-m').value;
-  const before=document.getElementById('sl-before').value;
-  const after=document.getElementById('sl-after').value;
-  const db=Math.max(0,parseInt(document.getElementById('d-before').value)||0);
-  const da=Math.max(1,parseInt(document.getElementById('d-after').value)||60);
-  const prayers=Object.keys(PI).filter(p=>{ const c=document.getElementById(`cb-${p}`); return c&&c.checked; });
-  
-  if(!prayers.length){
-    content.style.display = 'none';
+
+  const prayers = Object.keys(PI).filter(p => { const c = document.getElementById(`cb-${p}`); return c && c.checked; });
+  if (!prayers.length) {
+    toggle.style.display = 'none';
+    dynSect.style.display = 'none';
+    staticSect.style.display = 'none';
     empty.textContent = 'Select at least one prayer.';
     empty.style.display = 'flex';
     return;
   }
 
-  content.style.display = 'block';
+  toggle.style.display = 'flex';
   empty.style.display = 'none';
 
-  const p=new URLSearchParams({lat:S.lat.toFixed(6),lng:S.lng.toFixed(6),method,asr,before,after,hours_before:db*24,hours_after:da*24,tz,prayers:prayers.join(','),location:S.name||''});
-  const base='https://prayer.hablullah.app/prayer.php';
-  const httpsURL=`${base}?${p}`;
-  const webcalURL=httpsURL.replace('https://','webcal://');
-  
-  document.getElementById('https-url').textContent=httpsURL;
-  document.getElementById('webcal-url').textContent=webcalURL;
-  document.getElementById('dl-ics').href=httpsURL;
-  document.getElementById('sub-btn').dataset.url=webcalURL;
+  // Update dynamic form city/country from location
+  updateDynFormLocation();
+
+  // Generate calendar key if not set
+  if (!currentCalendarKey) {
+    currentCalendarKey = generateCalendarKey();
+    document.getElementById('dyn-calkey').value = currentCalendarKey;
+  }
+
+  // Build static URLs
+  const params = gatherCalendarParams();
+  const p = new URLSearchParams(params);
+  const base = 'https://prayer.hablullah.app/prayer.php';
+  const httpsURL = `${base}?${p}`;
+  const webcalURL = httpsURL.replace('https://', 'webcal://');
+
+  document.getElementById('https-url').textContent = httpsURL;
+  document.getElementById('webcal-url').textContent = webcalURL;
+  document.getElementById('dl-ics').href = httpsURL;
+  document.getElementById('sub-btn').dataset.url = webcalURL;
+
+  switchFeedMode(currentFeedMode);
 }
-function doSubscribe(){ const u=document.getElementById('sub-btn').dataset.url; if(u) window.location.href=u; }
-async function cpURL(sid,fbid){
-  const txt=document.getElementById(sid).textContent;
-  try{ await navigator.clipboard.writeText(txt); }
-  catch(e){ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
-  const fb=document.getElementById(fbid); fb.classList.add('show'); setTimeout(()=>fb.classList.remove('show'),2200);
+
+function switchFeedMode(mode) {
+  currentFeedMode = mode;
+  const dynSect = document.getElementById('feed-dynamic');
+  const staticSect = document.getElementById('feed-static');
+
+  // Update radio buttons
+  document.querySelectorAll('.feed-toggle input').forEach(r => {
+    r.checked = (r.value === mode);
+  });
+
+  if (mode === 'dynamic') {
+    dynSect.style.display = 'block';
+    staticSect.style.display = 'none';
+  } else {
+    dynSect.style.display = 'none';
+    staticSect.style.display = 'block';
+  }
+}
+
+function updateDynFormLocation() {
+  document.getElementById('dyn-city').value = S.city || S.name || '';
+  document.getElementById('dyn-country').value = S.country || '';
+}
+
+/* ================================================================
+   Dynamic Calendar — Submit Registration
+================================================================ */
+async function submitDynamicCalendar(e) {
+  e.preventDefault();
+  const email = document.getElementById('dyn-email').value.trim();
+  const calKey = document.getElementById('dyn-calkey').value.trim();
+  const name = document.getElementById('dyn-name').value.trim();
+  const phone = document.getElementById('dyn-phone').value.trim();
+  const city = document.getElementById('dyn-city').value.trim();
+  const country = document.getElementById('dyn-country').value.trim();
+  const errEl = document.getElementById('dyn-error');
+  const btn = document.getElementById('dyn-submit-btn');
+
+  // Validate
+  errEl.style.display = 'none';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    document.getElementById('dyn-email').classList.add('error');
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return false;
+  }
+  document.getElementById('dyn-email').classList.remove('error');
+
+  const params = gatherCalendarParams();
+  if (!params.lat || !params.lng) {
+    errEl.textContent = 'Please select a location first.';
+    errEl.style.display = 'block';
+    return false;
+  }
+
+  // Submit
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'register');
+    fd.append('email', email);
+    fd.append('calendar_key', calKey);
+    fd.append('name', name);
+    fd.append('phone', phone);
+    fd.append('city', city);
+    fd.append('country', country);
+    fd.append('params', JSON.stringify(params));
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!data.success) {
+      errEl.textContent = data.message || 'Registration failed. Please try again.';
+      errEl.style.display = 'block';
+      return false;
+    }
+
+    // Show success card
+    const dynamicLink = data.dynamic_link;
+    const webcalLink = data.webcal_link || dynamicLink.replace('https://', 'webcal://');
+    const emailNote = data.email_sent
+      ? `<p style="font-size:.84rem;color:var(--muted);margin-top:.5rem;">✉️ Link also sent to <strong>${esc(email)}</strong></p>`
+      : `<p style="font-size:.84rem;color:var(--amber);margin-top:.5rem;">⚠️ Email delivery failed, but your calendar was created. Please copy the link below.</p>`;
+
+    document.getElementById('dyn-success').innerHTML = `
+      <div class="success-card">
+        <div class="sc-title">✅ Calendar Created Successfully!</div>
+        <div class="sc-link" id="dyn-link-txt">${esc(dynamicLink)}</div>
+        <div class="sc-actions">
+          <button class="btn btn-prim" onclick="window.location.href='${webcalLink}'">📅 Subscribe</button>
+          <button class="btn btn-ghost" onclick="cpURL('dyn-link-txt','dyn-cpfb')">Copy Link</button>
+          <span class="cpfb" id="dyn-cpfb">Copied!</span>
+        </div>
+        ${emailNote}
+      </div>`;
+    document.getElementById('dyn-success').style.display = 'block';
+
+    // Store state
+    isAuthenticated = true;
+    authenticatedEmail = email;
+
+  } catch (err) {
+    errEl.textContent = 'Network error. Please check your connection and try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+  return false;
+}
+
+/* ================================================================
+   OTP — Send / Verify / Resend
+================================================================ */
+async function sendOTPForLogin() {
+  const calKey = document.getElementById('dyn-calkey').value.trim();
+  if (!calKey) return;
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'send-otp');
+    fd.append('calendar_key', calKey);
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.message || 'Failed to send OTP.');
+      return;
+    }
+
+    showOTPModal(data.masked_email, calKey);
+  } catch (err) {
+    alert('Network error. Please try again.');
+  }
+}
+
+function showOTPModal(maskedEmail, calKey) {
+  document.getElementById('otp-masked-email').textContent = maskedEmail;
+  document.getElementById('otp-code').value = '';
+  document.getElementById('otp-error').style.display = 'none';
+  document.getElementById('otp-overlay').style.display = 'flex';
+  document.getElementById('otp-overlay').dataset.calKey = calKey;
+  document.getElementById('otp-code').focus();
+  startOTPCountdown(600); // 10 minutes
+  startResendCooldown(60); // 60 seconds
+}
+
+function closeOTPModal() {
+  document.getElementById('otp-overlay').style.display = 'none';
+  if (otpCountdownInterval) clearInterval(otpCountdownInterval);
+  if (otpResendCooldown) clearInterval(otpResendCooldown);
+}
+
+function startOTPCountdown(seconds) {
+  if (otpCountdownInterval) clearInterval(otpCountdownInterval);
+  let remaining = seconds;
+  const timerEl = document.getElementById('otp-timer');
+  const update = () => {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    if (remaining <= 0) {
+      clearInterval(otpCountdownInterval);
+      timerEl.textContent = 'Expired';
+    }
+    remaining--;
+  };
+  update();
+  otpCountdownInterval = setInterval(update, 1000);
+}
+
+function startResendCooldown(seconds) {
+  if (otpResendCooldown) clearInterval(otpResendCooldown);
+  const btn = document.getElementById('otp-resend-btn');
+  let remaining = seconds;
+  btn.disabled = true;
+  btn.textContent = `Resend OTP (${remaining}s)`;
+  otpResendCooldown = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(otpResendCooldown);
+      btn.disabled = false;
+      btn.textContent = 'Resend OTP';
+    } else {
+      btn.textContent = `Resend OTP (${remaining}s)`;
+    }
+  }, 1000);
+}
+
+async function resendOTP() {
+  const calKey = document.getElementById('otp-overlay').dataset.calKey;
+  if (!calKey) return;
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'send-otp');
+    fd.append('calendar_key', calKey);
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (data.success) {
+      startOTPCountdown(600);
+      startResendCooldown(60);
+      document.getElementById('otp-error').style.display = 'none';
+    } else {
+      const errEl = document.getElementById('otp-error');
+      errEl.textContent = data.message || 'Failed to resend OTP.';
+      errEl.style.display = 'block';
+    }
+  } catch (err) {
+    const errEl = document.getElementById('otp-error');
+    errEl.textContent = 'Network error.';
+    errEl.style.display = 'block';
+  }
+}
+
+async function verifyOTP() {
+  const calKey = document.getElementById('otp-overlay').dataset.calKey;
+  const code = document.getElementById('otp-code').value.trim();
+  const errEl = document.getElementById('otp-error');
+  const btn = document.getElementById('otp-verify-btn');
+
+  if (!code || code.length < 6) {
+    errEl.textContent = 'Please enter the 6-digit code.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'verify-otp');
+    fd.append('calendar_key', calKey);
+    fd.append('code', code);
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!data.success) {
+      errEl.textContent = data.message || 'Invalid or expired code.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Authenticated! Populate form with calendar params
+    isAuthenticated = true;
+    authenticatedEmail = data.user?.email || '';
+    closeOTPModal();
+
+    if (data.params) {
+      populateFormFromCalendar(data.params);
+    }
+
+    // Update UI: hide login prompt, show form
+    document.getElementById('login-prompt').style.display = 'none';
+    document.getElementById('dyn-form-wrap').style.display = 'block';
+    document.getElementById('dyn-email').value = authenticatedEmail;
+    document.getElementById('dyn-email').readOnly = true;
+    document.getElementById('dyn-submit-btn').querySelector('.btn-text').textContent = '💾 Save Changes & Send Link';
+
+  } catch (err) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verify';
+  }
+}
+
+/* ================================================================
+   Calendar — Load Existing / Populate
+================================================================ */
+async function checkExistingCalendar() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const cid = urlParams.get('cid');
+  if (!cid) return;
+
+  currentCalendarKey = cid;
+  document.getElementById('dyn-calkey').value = cid;
+
+  try {
+    const res = await fetch(`${API_BASE}?action=get-calendar&key=${encodeURIComponent(cid)}`);
+    const data = await res.json();
+
+    if (!data.success) return;
+
+    // Populate form fields from stored params
+    if (data.params) {
+      populateFormFromCalendar(data.params);
+    }
+
+    // Switch to feed tab
+    switchTab('feed');
+
+    // Show login prompt (user needs to authenticate to modify)
+    document.getElementById('login-prompt').style.display = 'block';
+    document.getElementById('login-prompt-desc').textContent =
+      `This calendar is owned by ${data.owner_email || 'a registered user'}. To modify its settings, please verify your identity by clicking the button below.`;
+    document.getElementById('dyn-form-wrap').style.display = 'none';
+
+  } catch (err) {
+    console.error('Failed to load calendar:', err);
+  }
+}
+
+function populateFormFromCalendar(params) {
+  if (params.lat && params.lng) {
+    setLoc(parseFloat(params.lat), parseFloat(params.lng), params.location || '', true);
+  }
+  if (params.method) document.getElementById('method').value = params.method;
+  if (params.asr) document.getElementById('asr-m').value = params.asr;
+  if (params.tz) document.getElementById('tz-in').value = params.tz;
+  if (params.before !== undefined) { document.getElementById('sl-before').value = params.before; updSlider('before', false); }
+  if (params.after !== undefined) { document.getElementById('sl-after').value = params.after; updSlider('after', false); }
+  if (params.hours_before !== undefined) document.getElementById('d-before').value = Math.round(params.hours_before / 24);
+  if (params.hours_after !== undefined) document.getElementById('d-after').value = Math.round(params.hours_after / 24);
+
+  // Prayers checkboxes
+  if (params.prayers) {
+    const selected = params.prayers.split(',').map(s => s.trim());
+    Object.keys(PI).forEach(p => {
+      const el = document.getElementById('cb-' + p);
+      if (el) el.checked = selected.includes(p);
+    });
+  }
+
+  onSettingsChange(true);
+}
+
+function resetToNewCalendar() {
+  currentCalendarKey = generateCalendarKey();
+  document.getElementById('dyn-calkey').value = currentCalendarKey;
+  document.getElementById('login-prompt').style.display = 'none';
+  document.getElementById('dyn-form-wrap').style.display = 'block';
+  document.getElementById('dyn-email').value = '';
+  document.getElementById('dyn-email').readOnly = false;
+  document.getElementById('dyn-submit-btn').querySelector('.btn-text').textContent = '📨 Generate & Send Link';
+  document.getElementById('dyn-success').style.display = 'none';
+  document.getElementById('dyn-success').innerHTML = '';
+  isAuthenticated = false;
+  authenticatedEmail = '';
+
+  // Remove cid from URL without reload
+  const url = new URL(window.location);
+  url.searchParams.delete('cid');
+  history.replaceState(null, '', url);
+}
+
+/* ================================================================
+   Static feed helpers
+================================================================ */
+function doSubscribe() { const u = document.getElementById('sub-btn').dataset.url; if (u) window.location.href = u; }
+async function cpURL(sid, fbid) {
+  const txt = document.getElementById(sid).textContent;
+  try { await navigator.clipboard.writeText(txt); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+  const fb = document.getElementById(fbid); fb.classList.add('show'); setTimeout(() => fb.classList.remove('show'), 2200);
 }
 
 /* ================================================================
    Init
 ================================================================ */
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', () => {
   applyTheme(getTheme());
   initMap();
-  
-  document.getElementById('tz-in').value=S.tz;
+
+  document.getElementById('tz-in').value = S.tz;
   updSlider('before', false); updSlider('after', false);
-  
-  const isPortrait=()=>window.innerHeight>window.innerWidth;
-  const isMobile=()=>window.innerWidth<=768;
-  if(isMobile()&&isPortrait()){
+
+  const isPortrait = () => window.innerHeight > window.innerWidth;
+  const isMobile = () => window.innerWidth <= 768;
+  if (isMobile() && isPortrait()) {
     document.getElementById('body-set').classList.add('collapsed');
     document.getElementById('chev-set').classList.remove('open');
   }
-  window.addEventListener('resize',()=>{ if(activeTab==='map') map.invalidateSize(); });
+  window.addEventListener('resize', () => { if (activeTab === 'map') map.invalidateSize(); });
 
   // Load saved settings or fallback to IP / London
   initDefaultLoc();
+
+  // Check for ?cid= in URL (existing calendar)
+  checkExistingCalendar();
+
+  // OTP modal: close on overlay click
+  document.getElementById('otp-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeOTPModal();
+  });
+  // OTP modal: close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('otp-overlay').style.display !== 'none') {
+      closeOTPModal();
+    }
+  });
+  // OTP input: auto-submit on 6 digits
+  document.getElementById('otp-code').addEventListener('input', (e) => {
+    e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+    if (e.target.value.length === 6) verifyOTP();
+  });
 });
 </script>
 </body>

@@ -20,5 +20,5 @@ define('DB_PASS', 'xxxxxxxxxxx');
 define('APP_BASE_URL', 'https://prayer.hablullah.app');
 
 /* ── Email Sender ───────────────────────────────────────────── */
-define('SENDER_EMAIL', 'salahcalendar@azanclock.com');
+define('SENDER_EMAIL', 'contact@hablullah.app');
 define('SENDER_NAME',  'Salah Calendar');

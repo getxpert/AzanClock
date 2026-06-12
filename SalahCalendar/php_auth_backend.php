@@ -12,6 +12,9 @@
  * CSRF protection, and secrets management.
  */
 
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/BrevoEmailService.php';
+
 /* ==============================
    DATABASE CONNECTION
 ============================== */
@@ -21,7 +24,7 @@ class Database {
 
     public static function getConnection() {
         if (!self::$conn) {
-            self::$conn = new mysqli("localhost", "db_user", "db_pass", "db_name");
+            self::$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
             if (self::$conn->connect_error) {
                 die("DB connection failed");
             }
@@ -100,12 +103,20 @@ class OTPService {
     }
 
     public static function sendEmail($email, $code) {
-        // Replace with real mailer (SMTP, SendGrid, etc.)
-        $subject = "Your login code";
-        $message = "Your verification code is: $code";
-        $headers = "From: no-reply@example.com";
+        $emailService = new BrevoEmailService(BREVO_API_KEY);
 
-        mail($email, $subject, $message, $headers);
+        $subject = "Your Salah Calendar Verification Code";
+        $htmlBody = "
+        <div style='font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:30px;'>
+            <h2 style='color:#1B7A56;'>Verification Code</h2>
+            <p>Your verification code is:</p>
+            <div style='background:#eaf0e6;border-radius:10px;padding:20px;text-align:center;margin:20px 0;'>
+                <span style='font-family:monospace;font-size:32px;font-weight:bold;color:#1B7A56;letter-spacing:6px;'>$code</span>
+            </div>
+            <p style='color:#666;font-size:13px;'>This code expires in 5 minutes.</p>
+        </div>";
+
+        return $emailService->sendEmail($email, $subject, $htmlBody);
     }
 }
 

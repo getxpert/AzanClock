@@ -153,7 +153,7 @@ function actionRegister() {
 
     // ── Send email ───────────────────────────────────────────
     $locationName = $params['location'] ?? 'your location';
-    $emailService = new BrevoEmailService(BREVO_API_KEY, SENDER_EMAIL, SENDER_NAME);
+    $emailService = new BrevoEmailService(BREVO_API_KEY);
     $htmlBody = buildCalendarEmailHTML($dynamicLink, $webcalLink, $locationName, $calendarKey);
     $result = $emailService->sendEmail($email, 'Your Salah Calendar Subscription Link', $htmlBody, $name ?: '');
 
@@ -209,7 +209,7 @@ function actionSendOTP() {
     $stmt->execute([$email, $code, $expiry]);
 
     // Send OTP email
-    $emailService = new BrevoEmailService(BREVO_API_KEY, SENDER_EMAIL, SENDER_NAME);
+    $emailService = new BrevoEmailService(BREVO_API_KEY);
     $htmlBody = buildOTPEmailHTML($code, $row['name'] ?: '');
     $emailService->sendEmail($email, 'Your Salah Calendar Verification Code', $htmlBody, $row['name'] ?: '');
 

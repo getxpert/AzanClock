@@ -3,6 +3,8 @@
  * prayer.php — Prayer Times iCalendar Feed (v2.3 engine)
  *
  * Query parameters:
+ *   cid          string    optional  Calendar ID (dynamic calendar key)
+ *                                    If provided, all params are loaded from DB.
  *   lat          float     required  Latitude  (-90  to  90)
  *   lng          float     required  Longitude (-180 to 180)
  *   method       string    default MWL  Calculation method key (e.g. MWL, ISNA, Makkah)
@@ -20,7 +22,9 @@
  *
  * Example:
  *   prayer.php?lat=51.5074&lng=-0.1278&method=MWL&tz=Europe%2FLondon&before=15&after=30
+ *   prayer.php?cid=a3b7x9k2
  */
+require_once __DIR__ . '/config.php';
 
 // =====================================================================
 //  EMBEDDED PrayTimes class (v2.3)
@@ -444,6 +448,112 @@ function ical_escape(string $s): string
     return $s;
 }
 
+// Error response helper
+function abort(int $code, string $msg): void
+{
+    http_response_code($code);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo $msg . "\n";
+    exit;
+}
+
+// =====================================================================
+//  Dynamic Calendar ID (cid) Support
+//  If ?cid=KEY is provided, load params from salah_calendars table
+// =====================================================================
+$cid = get_str('cid', '', 36);
+$dynamic_calendar_id = null;  // DB id for access logging
+
+if ($cid !== '') {
+    try {
+        $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+        $pdo = new PDO($dsn, DB_USER, DB_PASS, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
+
+        $stmt = $pdo->prepare('SELECT id, params FROM salah_calendars WHERE calendar_key = ?');
+        $stmt->execute([$cid]);
+        $cal = $stmt->fetch();
+
+        if (!$cal) {
+            abort(404, "Calendar not found for key: {$cid}");
+        }
+
+        $dynamic_calendar_id = (int)$cal['id'];
+        $stored_params = json_decode($cal['params'], true);
+
+        if (is_array($stored_params)) {
+            // Inject stored params into $_GET so existing parsing below works
+            foreach ($stored_params as $pk => $pv) {
+                if (!isset($_GET[$pk]) || $_GET[$pk] === '') {
+                    $_GET[$pk] = (string)$pv;
+                }
+            }
+        }
+
+        // ── Log access ───────────────────────────────────────
+        $user_ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        // Check for forwarded IP
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $user_ip = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+        }
+        // Convert IPv6-mapped IPv4 (e.g. ::ffff:192.168.1.1) to plain IPv4
+        if (substr($user_ip, 0, 7) === '::ffff:') {
+            $user_ip = substr($user_ip, 7);
+        }
+        $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+        // Parse device/OS/app from user agent
+        $details = ['user_agent' => substr($user_agent, 0, 500)];
+        if (preg_match('/\b(iPhone|iPad|iPod)\b/i', $user_agent, $dm)) {
+            $details['device'] = $dm[1];
+            $details['os'] = 'iOS';
+            if (preg_match('/OS (\d+[_\.]\d+)/i', $user_agent, $vm)) {
+                $details['version'] = str_replace('_', '.', $vm[1]);
+            }
+        } elseif (preg_match('/Android\s*([\d.]+)?/i', $user_agent, $dm)) {
+            $details['os'] = 'Android';
+            if (!empty($dm[1])) $details['version'] = $dm[1];
+        } elseif (preg_match('/Windows NT\s*([\d.]+)?/i', $user_agent, $dm)) {
+            $details['os'] = 'Windows';
+            if (!empty($dm[1])) $details['version'] = $dm[1];
+        } elseif (preg_match('/Macintosh|Mac OS X/i', $user_agent)) {
+            $details['os'] = 'macOS';
+            if (preg_match('/Mac OS X (\d+[_\.]\d+)/i', $user_agent, $vm)) {
+                $details['version'] = str_replace('_', '.', $vm[1]);
+            }
+        } elseif (preg_match('/Linux/i', $user_agent)) {
+            $details['os'] = 'Linux';
+        }
+
+        // Detect calendar app
+        if (preg_match('/Thunderbird/i', $user_agent)) {
+            $details['app'] = 'Thunderbird';
+        } elseif (preg_match('/Microsoft Outlook/i', $user_agent)) {
+            $details['app'] = 'Microsoft Outlook';
+        } elseif (preg_match('/Google-Calendar/i', $user_agent)) {
+            $details['app'] = 'Google Calendar';
+        } elseif (preg_match('/CalendarAgent|dataaccessd|CalendarStore/i', $user_agent)) {
+            $details['app'] = 'Apple Calendar';
+        }
+
+        try {
+            $logStmt = $pdo->prepare(
+                'INSERT INTO access_logs (calendar_id, user_ip, details) VALUES (?, ?, ?)'
+            );
+            $logStmt->execute([$dynamic_calendar_id, trim($user_ip), json_encode($details)]);
+        } catch (Exception $logEx) {
+            error_log('SalahCalendar access_log error: ' . $logEx->getMessage());
+        }
+
+    } catch (PDOException $e) {
+        error_log('SalahCalendar DB error: ' . $e->getMessage());
+        abort(500, "Database error. Please try again later.");
+    }
+}
+
 // =====================================================================
 //  Parse & validate inputs
 // =====================================================================
@@ -484,15 +594,6 @@ $after  = (int)(round($after_raw  / 5) * 5);
 
 // Enforce minimum 5-min event window
 if ($before === 0 && $after === 0) $after = 5;
-
-// Error response helper
-function abort(int $code, string $msg): void
-{
-    http_response_code($code);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo $msg . "\n";
-    exit;
-}
 
 if ($lat === null || $lng === null) {
     abort(400, "Missing required parameters: 'lat' and 'lng'.\n"
