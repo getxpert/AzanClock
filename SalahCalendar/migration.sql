@@ -54,3 +54,32 @@ CREATE TABLE IF NOT EXISTS access_logs (
   INDEX idx_calendar_id (calendar_id),
   INDEX idx_accessed_at (accessed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- ── New Table: user_sessions ───────────────────────────────
+-- Session tokens for persistent 24h login.
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  session_token VARCHAR(128) UNIQUE NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_session_token (session_token),
+  INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- ── New Table: magic_links ─────────────────────────────────
+-- Magic links for one-click sign-in from email.
+CREATE TABLE IF NOT EXISTS magic_links (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  token VARCHAR(128) UNIQUE NOT NULL,
+  expiry DATETIME NOT NULL,
+  used TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_token (token),
+  INDEX idx_expiry (expiry)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -582,6 +582,101 @@ select.inp {
 .login-prompt .lp-desc { font-size:.84rem; color:var(--muted); line-height:1.6; margin-bottom:.75rem; }
 .login-prompt .lp-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
 
+/* ── Account Section ──────────────────────────────────────────── */
+.account-wrap { position:relative; }
+.account-btn {
+  display:flex; align-items:center; gap:.4rem;
+  background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.2);
+  color:var(--hdr-text); border-radius:100px; padding:.35rem .85rem .35rem .5rem;
+  cursor:pointer; font-family:var(--font); font-size:.82rem; font-weight:500;
+  transition:all .2s; white-space:nowrap;
+}
+.account-btn:hover { background:rgba(255,255,255,.25); }
+.account-btn .account-icon {
+  width:26px; height:26px; border-radius:50%;
+  background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center;
+  font-size:.85rem;
+}
+.account-btn.signed-in { background:rgba(46,155,114,.3); border-color:rgba(46,155,114,.5); }
+.account-btn.signed-in .account-icon { background:var(--primary); color:#fff; }
+
+.account-dropdown {
+  position:absolute; top:calc(100% + 8px); right:0;
+  background:var(--surf); border:1px solid var(--border); border-radius:var(--rlg);
+  box-shadow:var(--shadow-lg); min-width:280px; z-index:2000;
+  display:none; overflow:hidden;
+  animation:slideUp .2s ease;
+}
+.account-dropdown.open { display:block; }
+[data-theme="dark"] .account-dropdown { background:var(--surf2); }
+.acct-header { padding:1rem 1.25rem; border-bottom:1px solid var(--border); }
+.acct-email { font-size:.88rem; font-weight:600; color:var(--text); word-break:break-all; }
+.acct-meta { font-size:.76rem; color:var(--muted); margin-top:.25rem; }
+.acct-menu-item {
+  display:flex; align-items:center; gap:.6rem; padding:.75rem 1.25rem;
+  font-size:.88rem; color:var(--text); cursor:pointer; transition:background .15s;
+  border:none; background:none; width:100%; text-align:left; font-family:var(--font);
+}
+.acct-menu-item:hover { background:var(--primary-glow); }
+.acct-menu-item.danger { color:var(--danger); }
+.acct-menu-item.danger:hover { background:rgba(201,74,58,.08); }
+.acct-divider { height:1px; background:var(--border); }
+
+/* ── Auth Modal ────────────────────────────────────────────────── */
+.auth-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center; z-index:9999;
+  animation:fadeIn .2s ease;
+}
+[data-theme="dark"] .auth-overlay { background:rgba(0,0,0,.7); }
+.auth-modal {
+  background:var(--surf); border:1px solid var(--border); border-radius:var(--rlg);
+  padding:2rem; max-width:440px; width:90%; box-shadow:var(--shadow-lg);
+  animation:slideUp .3s ease; position:relative;
+}
+.auth-modal h3 { font-size:1.15rem; font-weight:600; color:var(--text); margin:0 0 .5rem; display:flex; align-items:center; gap:.5rem; }
+.auth-modal .auth-desc { font-size:.88rem; color:var(--muted); line-height:1.6; margin-bottom:1.25rem; }
+.auth-close {
+  position:absolute; top:1rem; right:1rem; background:none; border:none;
+  color:var(--muted); font-size:1.2rem; cursor:pointer; padding:.25rem;
+}
+.auth-method-toggle {
+  display:flex; gap:.5rem; margin-bottom:1.25rem;
+  background:var(--surf2); border-radius:var(--r); padding:4px; border:1px solid var(--border);
+}
+.auth-method-toggle button {
+  flex:1; padding:.6rem; border:none; border-radius:calc(var(--r) - 2px);
+  background:none; color:var(--muted); font-family:var(--font); font-size:.85rem;
+  font-weight:500; cursor:pointer; transition:all .2s;
+}
+.auth-method-toggle button.active {
+  background:var(--primary); color:#fff; box-shadow:var(--shadow-sm);
+}
+.auth-error { color:var(--danger); font-size:.82rem; margin-bottom:.75rem; display:none; }
+.auth-success {
+  background:var(--info-dim); border:1px solid rgba(27,122,86,.25); border-radius:var(--r);
+  padding:1rem; font-size:.88rem; color:var(--info-text); line-height:1.6;
+  display:none; margin-top:1rem;
+}
+
+/* ── Calendar Selection ────────────────────────────────────────── */
+.cal-select-wrap { margin-top:.75rem; }
+.cal-select-label { font-size:.78rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:.35rem; }
+.cal-option {
+  display:flex; align-items:center; gap:.5rem; padding:.6rem .85rem;
+  border:1px solid var(--border); border-radius:var(--r); margin-bottom:.5rem;
+  cursor:pointer; transition:all .15s; background:var(--inp-bg);
+}
+.cal-option:hover { border-color:var(--primary); }
+.cal-option.selected { border-color:var(--primary); background:var(--primary-dim); }
+.cal-option input[type=radio] { accent-color:var(--primary); flex-shrink:0; }
+.cal-option-label { font-size:.88rem; color:var(--text); flex:1; }
+.cal-option-meta { font-size:.75rem; color:var(--muted); }
+.key-status { font-size:.76rem; margin-top:.25rem; }
+.key-status.valid { color:var(--primary); }
+.key-status.invalid { color:var(--danger); }
+.key-status.checking { color:var(--muted); }
+
 </style>
 </head>
 <body>
@@ -594,6 +689,33 @@ select.inp {
   </div>
   <div class="hdr-sep"></div>
   <img src="assets/hablullah2.png" alt="Hablullah" class="hdr-tag" style="height: 30px; border: none; padding: 0; border-radius: 0;">
+  <div class="account-wrap" id="account-wrap">
+    <button class="account-btn" id="account-btn" onclick="toggleAccountMenu()">
+      <span class="account-icon" id="account-icon">👤</span>
+      <span id="account-label">Sign In</span>
+    </button>
+    <div class="account-dropdown" id="account-dropdown">
+      <!-- Signed-out state -->
+      <div id="acct-signed-out">
+        <div class="acct-header">
+          <div class="acct-email">Welcome to Salah Calendar</div>
+          <div class="acct-meta">Sign in to manage your calendars</div>
+        </div>
+        <button class="acct-menu-item" onclick="showAuthModal('otp')">🔑 Sign in with OTP</button>
+        <button class="acct-menu-item" onclick="showAuthModal('link')">🔗 Sign in via Email Link</button>
+      </div>
+      <!-- Signed-in state -->
+      <div id="acct-signed-in" style="display:none;">
+        <div class="acct-header">
+          <div class="acct-email" id="acct-user-email">—</div>
+          <div class="acct-meta" id="acct-user-meta">0 calendars</div>
+        </div>
+        <button class="acct-menu-item" onclick="switchTab('feed'); closeAccountMenu();">📅 My Calendars</button>
+        <div class="acct-divider"></div>
+        <button class="acct-menu-item danger" onclick="signOut()">🚪 Sign Out</button>
+      </div>
+    </div>
+  </div>
   <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">☀️</button>
 </header>
 
@@ -804,12 +926,22 @@ select.inp {
                 <div class="field">
                   <label class="lbl" for="dyn-email">Email Address <span class="req">*</span></label>
                   <input id="dyn-email" class="inp" type="email" placeholder="your@email.com" required autocomplete="email">
+                  <span class="hint" id="dyn-email-hint">Enter your email to sign in or create an account</span>
                 </div>
+
+                <!-- Calendar selection (shown after email verification for existing users) -->
+                <div id="dyn-cal-select" class="cal-select-wrap" style="display:none;">
+                  <div class="cal-select-label">Calendar Option</div>
+                  <div id="dyn-cal-options"></div>
+                </div>
+
                 <div class="field">
-                  <label class="lbl" for="dyn-calkey">Calendar Key</label>
-                  <input id="dyn-calkey" class="inp" type="text" readonly>
-                  <span class="hint">Auto-generated unique identifier for your calendar</span>
+                  <label class="lbl" for="dyn-calkey">Calendar ID</label>
+                  <input id="dyn-calkey" class="inp" type="text" autocomplete="off">
+                  <div class="key-status" id="dyn-key-status"></div>
+                  <span class="hint">Unique identifier for your calendar</span>
                 </div>
+
                 <div class="field-row">
                   <div class="field">
                     <label class="lbl" for="dyn-name">Name <span style="color:var(--muted);font-weight:400;text-transform:none;">(optional)</span></label>
@@ -831,7 +963,7 @@ select.inp {
                   </div>
                 </div>
                 <button type="submit" class="dyn-submit" id="dyn-submit-btn">
-                  <span class="btn-text">📨 Generate & Send Link</span>
+                  <span class="btn-text">📨 Generate &amp; Send Link</span>
                   <span class="spinner"></span>
                 </button>
                 <p class="err-msg" id="dyn-error"></p>
@@ -915,6 +1047,54 @@ select.inp {
       </div>
     </div>
 
+    <!-- ═══ AUTH MODAL ═══ -->
+    <div id="auth-overlay" class="auth-overlay" style="display:none;">
+      <div class="auth-modal">
+        <button class="auth-close" onclick="closeAuthModal()" title="Close">✕</button>
+        <h3>🔐 Sign In to Salah Calendar</h3>
+        <p class="auth-desc">Access your saved calendars and manage your prayer time subscriptions.</p>
+
+        <div class="auth-method-toggle">
+          <button id="auth-method-otp" class="active" onclick="switchAuthMethod('otp')">🔑 OTP Code</button>
+          <button id="auth-method-link" onclick="switchAuthMethod('link')">🔗 Email Link</button>
+        </div>
+
+        <p class="auth-error" id="auth-error"></p>
+
+        <!-- Email input (shared) -->
+        <div class="field" id="auth-email-field">
+          <label class="lbl" for="auth-email">Email Address</label>
+          <input id="auth-email" class="inp" type="email" placeholder="your@email.com" autocomplete="email">
+        </div>
+
+        <!-- OTP section -->
+        <div id="auth-otp-section" style="display:none;">
+          <div class="otp-email-note" style="margin-bottom:1rem;">
+            📬 An OTP has been sent to <strong id="auth-otp-masked-email">—</strong>. Check your inbox and spam folder.
+          </div>
+          <div class="otp-input-row">
+            <input class="otp-input" id="auth-otp-code" type="text" maxlength="6" placeholder="000000" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
+            <button class="otp-verify-btn" id="auth-otp-verify-btn" onclick="verifyAuthOTP()">Verify</button>
+          </div>
+          <div class="otp-footer">
+            <span class="otp-countdown">Expires in: <span id="auth-otp-timer">1:40</span></span>
+            <button class="otp-resend" id="auth-otp-resend" onclick="resendAuthOTP()" disabled>Resend OTP</button>
+          </div>
+        </div>
+
+        <!-- Send button (for email entry step) -->
+        <button class="dyn-submit" id="auth-send-btn" onclick="sendAuthAction()" style="margin-top:1rem;width:100%;">
+          <span class="btn-text" id="auth-send-text">Send OTP Code</span>
+          <span class="spinner"></span>
+        </button>
+
+        <!-- Magic link success message -->
+        <div class="auth-success" id="auth-link-success">
+          ✅ A sign-in link has been sent to your email. Please check your inbox and click the link to sign in. The link expires in 24 hours.
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -940,6 +1120,500 @@ function toggleTheme(){
   const next=cur==='dark'?'light':'dark';
   localStorage.setItem('sc-theme',next);
   applyTheme(next);
+}
+
+/* ================================================================
+   Session Management
+================================================================ */
+function getSessionToken() {
+  try {
+    const data = JSON.parse(localStorage.getItem('sc-session') || 'null');
+    if (!data || !data.token) return null;
+    if (new Date(data.expires_at) <= new Date()) {
+      clearSession();
+      return null;
+    }
+    return data.token;
+  } catch(e) { return null; }
+}
+
+function setSessionToken(token, expiresAt, email, name, calendarCount) {
+  localStorage.setItem('sc-session', JSON.stringify({
+    token, expires_at: expiresAt, email, name: name || '', calendar_count: calendarCount || 0
+  }));
+  updateAccountUI();
+}
+
+function getSessionData() {
+  try {
+    return JSON.parse(localStorage.getItem('sc-session') || 'null');
+  } catch(e) { return null; }
+}
+
+function clearSession() {
+  localStorage.removeItem('sc-session');
+  isAuthenticated = false;
+  authenticatedEmail = '';
+  updateAccountUI();
+}
+
+async function checkSessionOnLoad() {
+  const token = getSessionToken();
+  if (!token) {
+    updateAccountUI();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}?action=check-session&session_token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+
+    if (data.success) {
+      isAuthenticated = true;
+      authenticatedEmail = data.user.email;
+      const sessionData = getSessionData();
+      setSessionToken(sessionData.token, sessionData.expires_at, data.user.email, data.user.name, data.calendar_count);
+    } else {
+      clearSession();
+    }
+  } catch(e) {
+    // Keep local session if network fails
+    const sessionData = getSessionData();
+    if (sessionData) {
+      isAuthenticated = true;
+      authenticatedEmail = sessionData.email;
+    }
+    updateAccountUI();
+  }
+}
+
+async function handleMagicLinkToken() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  if (!token) return;
+
+  try {
+    const res = await fetch(`${API_BASE}?action=verify-magic-link&token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+
+    if (data.success && data.session) {
+      setSessionToken(data.session.token, data.session.expires_at, data.user.email, data.user.name, data.calendar_count);
+      isAuthenticated = true;
+      authenticatedEmail = data.user.email;
+    }
+  } catch(e) {
+    console.error('Magic link verification failed:', e);
+  }
+
+  // Remove token from URL
+  const url = new URL(window.location);
+  url.searchParams.delete('token');
+  history.replaceState(null, '', url);
+}
+
+/* ================================================================
+   Account UI
+================================================================ */
+function updateAccountUI() {
+  const btn = document.getElementById('account-btn');
+  const label = document.getElementById('account-label');
+  const icon = document.getElementById('account-icon');
+  const signedOut = document.getElementById('acct-signed-out');
+  const signedIn = document.getElementById('acct-signed-in');
+
+  const sessionData = getSessionData();
+
+  if (sessionData && sessionData.token && new Date(sessionData.expires_at) > new Date()) {
+    btn.classList.add('signed-in');
+    const emailShort = sessionData.email.split('@')[0];
+    label.textContent = emailShort.length > 12 ? emailShort.slice(0, 12) + '…' : emailShort;
+    icon.textContent = sessionData.email[0].toUpperCase();
+    document.getElementById('acct-user-email').textContent = sessionData.email;
+    document.getElementById('acct-user-meta').textContent = `${sessionData.calendar_count || 0} calendar${(sessionData.calendar_count || 0) !== 1 ? 's' : ''}`;
+    signedOut.style.display = 'none';
+    signedIn.style.display = 'block';
+  } else {
+    btn.classList.remove('signed-in');
+    label.textContent = 'Sign In';
+    icon.textContent = '👤';
+    signedOut.style.display = 'block';
+    signedIn.style.display = 'none';
+  }
+}
+
+function toggleAccountMenu() {
+  const dd = document.getElementById('account-dropdown');
+  dd.classList.toggle('open');
+}
+
+function closeAccountMenu() {
+  document.getElementById('account-dropdown').classList.remove('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.account-wrap')) {
+    closeAccountMenu();
+  }
+});
+
+async function signOut() {
+  closeAccountMenu();
+  const token = getSessionToken();
+  if (token) {
+    try {
+      const fd = new FormData();
+      fd.append('action', 'logout');
+      fd.append('session_token', token);
+      await fetch(API_BASE, { method: 'POST', body: fd });
+    } catch(e) {}
+  }
+  clearSession();
+  // Reset dynamic form
+  document.getElementById('dyn-email').value = '';
+  document.getElementById('dyn-email').readOnly = false;
+  document.getElementById('dyn-cal-select').style.display = 'none';
+  document.getElementById('dyn-submit-btn').querySelector('.btn-text').textContent = '📨 Generate & Send Link';
+  document.getElementById('dyn-success').style.display = 'none';
+  document.getElementById('dyn-success').innerHTML = '';
+}
+
+/* ================================================================
+   Auth Modal — Sign In via OTP or Magic Link
+================================================================ */
+let authMode = 'otp'; // 'otp' or 'link'
+let authOTPCountdownInterval = null;
+let authOTPResendCooldown = null;
+let authEmail = '';
+
+function showAuthModal(mode) {
+  closeAccountMenu();
+  authMode = mode || 'otp';
+  switchAuthMethod(authMode);
+  document.getElementById('auth-overlay').style.display = 'flex';
+  document.getElementById('auth-email').value = '';
+  document.getElementById('auth-email').focus();
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-otp-section').style.display = 'none';
+  document.getElementById('auth-email-field').style.display = 'block';
+  document.getElementById('auth-send-btn').style.display = 'flex';
+  document.getElementById('auth-link-success').style.display = 'none';
+}
+
+function closeAuthModal() {
+  document.getElementById('auth-overlay').style.display = 'none';
+  if (authOTPCountdownInterval) clearInterval(authOTPCountdownInterval);
+  if (authOTPResendCooldown) clearInterval(authOTPResendCooldown);
+}
+
+function switchAuthMethod(mode) {
+  authMode = mode;
+  document.getElementById('auth-method-otp').classList.toggle('active', mode === 'otp');
+  document.getElementById('auth-method-link').classList.toggle('active', mode === 'link');
+  document.getElementById('auth-send-text').textContent = mode === 'otp' ? 'Send OTP Code' : 'Send Sign-In Link';
+  // Reset state
+  document.getElementById('auth-otp-section').style.display = 'none';
+  document.getElementById('auth-email-field').style.display = 'block';
+  document.getElementById('auth-send-btn').style.display = 'flex';
+  document.getElementById('auth-link-success').style.display = 'none';
+  document.getElementById('auth-error').style.display = 'none';
+}
+
+async function sendAuthAction() {
+  const email = document.getElementById('auth-email').value.trim();
+  const errEl = document.getElementById('auth-error');
+  const btn = document.getElementById('auth-send-btn');
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  btn.classList.add('loading');
+  btn.disabled = true;
+  authEmail = email;
+
+  try {
+    const fd = new FormData();
+
+    if (authMode === 'otp') {
+      fd.append('action', 'send-login-otp');
+      fd.append('email', email);
+
+      const res = await fetch(API_BASE, { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!data.success) {
+        errEl.textContent = data.message || 'Failed to send OTP.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      // Show OTP input
+      document.getElementById('auth-otp-masked-email').textContent = data.masked_email || email;
+      document.getElementById('auth-otp-section').style.display = 'block';
+      document.getElementById('auth-email-field').style.display = 'none';
+      document.getElementById('auth-send-btn').style.display = 'none';
+      document.getElementById('auth-otp-code').value = '';
+      document.getElementById('auth-otp-code').focus();
+      startAuthOTPCountdown(100); // 100 seconds
+      startAuthResendCooldown(30);
+
+    } else {
+      // Magic link
+      fd.append('action', 'send-magic-link');
+      fd.append('email', email);
+
+      const res = await fetch(API_BASE, { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!data.success) {
+        errEl.textContent = data.message || 'Failed to send sign-in link.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      // Show success
+      document.getElementById('auth-send-btn').style.display = 'none';
+      document.getElementById('auth-email-field').style.display = 'none';
+      document.getElementById('auth-link-success').style.display = 'block';
+    }
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function startAuthOTPCountdown(seconds) {
+  if (authOTPCountdownInterval) clearInterval(authOTPCountdownInterval);
+  let remaining = seconds;
+  const timerEl = document.getElementById('auth-otp-timer');
+  const update = () => {
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    if (remaining <= 0) {
+      clearInterval(authOTPCountdownInterval);
+      timerEl.textContent = 'Expired';
+    }
+    remaining--;
+  };
+  update();
+  authOTPCountdownInterval = setInterval(update, 1000);
+}
+
+function startAuthResendCooldown(seconds) {
+  if (authOTPResendCooldown) clearInterval(authOTPResendCooldown);
+  const btn = document.getElementById('auth-otp-resend');
+  let remaining = seconds;
+  btn.disabled = true;
+  btn.textContent = `Resend OTP (${remaining}s)`;
+  authOTPResendCooldown = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(authOTPResendCooldown);
+      btn.disabled = false;
+      btn.textContent = 'Resend OTP';
+    } else {
+      btn.textContent = `Resend OTP (${remaining}s)`;
+    }
+  }, 1000);
+}
+
+async function resendAuthOTP() {
+  const fd = new FormData();
+  fd.append('action', 'send-login-otp');
+  fd.append('email', authEmail);
+
+  try {
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.success) {
+      startAuthOTPCountdown(100);
+      startAuthResendCooldown(30);
+      document.getElementById('auth-error').style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+async function verifyAuthOTP() {
+  const code = document.getElementById('auth-otp-code').value.trim();
+  const errEl = document.getElementById('auth-error');
+  const btn = document.getElementById('auth-otp-verify-btn');
+
+  if (!code || code.length < 6) {
+    errEl.textContent = 'Please enter the 6-digit code.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'verify-login-otp');
+    fd.append('email', authEmail);
+    fd.append('code', code);
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!data.success) {
+      errEl.textContent = data.message || 'Invalid or expired code.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Success! Store session
+    if (data.session) {
+      setSessionToken(data.session.token, data.session.expires_at, data.user.email, data.user.name, data.calendar_count);
+    }
+    isAuthenticated = true;
+    authenticatedEmail = data.user.email;
+
+    closeAuthModal();
+
+    // If on feed tab, update the dynamic form
+    if (activeTab === 'feed') {
+      document.getElementById('dyn-email').value = authenticatedEmail;
+      document.getElementById('dyn-email').readOnly = true;
+      await loadUserCalendarsForDynForm();
+    }
+
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verify';
+  }
+}
+
+/* ================================================================
+   Dynamic Calendar — Enhanced Flow
+================================================================ */
+let dynCalendarKeyValid = false;
+let dynCalKeyCheckTimer = null;
+let dynSelectedMode = 'new'; // 'new' or 'overwrite'
+let dynSelectedOverwriteKey = '';
+let dynUserCalendars = [];
+
+function updateDynSubmitState() {
+  const btn = document.getElementById('dyn-submit-btn');
+  const email = document.getElementById('dyn-email').value.trim();
+  const validEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  if (dynSelectedMode === 'overwrite') {
+    btn.disabled = !validEmail || !dynSelectedOverwriteKey;
+  } else {
+    btn.disabled = !validEmail || !dynCalendarKeyValid;
+  }
+}
+
+async function loadUserCalendarsForDynForm() {
+  const token = getSessionToken();
+  if (!token) return;
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'get-user-calendars');
+    fd.append('session_token', token);
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (data.success && data.calendars) {
+      dynUserCalendars = data.calendars;
+      showCalendarSelection(data.calendars);
+    }
+  } catch(e) {
+    console.error('Failed to load calendars:', e);
+  }
+}
+
+function showCalendarSelection(calendars) {
+  const selectWrap = document.getElementById('dyn-cal-select');
+  const optionsDiv = document.getElementById('dyn-cal-options');
+
+  if (!calendars || calendars.length === 0) {
+    // New user — only create new
+    selectWrap.style.display = 'none';
+    dynSelectedMode = 'new';
+    document.getElementById('dyn-calkey').readOnly = false;
+    if (!document.getElementById('dyn-calkey').value) {
+      currentCalendarKey = generateCalendarKey();
+      document.getElementById('dyn-calkey').value = currentCalendarKey;
+    }
+    return;
+  }
+
+  selectWrap.style.display = 'block';
+  let html = '';
+
+  // Create new option
+  html += `<label class="cal-option ${dynSelectedMode === 'new' ? 'selected' : ''}" onclick="selectCalendarMode('new', '')">
+    <input type="radio" name="cal-mode" value="new" ${dynSelectedMode === 'new' ? 'checked' : ''}>
+    <div>
+      <div class="cal-option-label">Create New Calendar</div>
+      <div class="cal-option-meta">Generate a new calendar with a unique ID</div>
+    </div>
+  </label>`;
+
+  // Overwrite existing options
+  calendars.forEach(cal => {
+    const loc = cal.params_summary || cal.calendar_key;
+    html += `<label class="cal-option ${dynSelectedMode === 'overwrite' && dynSelectedOverwriteKey === cal.calendar_key ? 'selected' : ''}" onclick="selectCalendarMode('overwrite', '${esc(cal.calendar_key)}')">
+      <input type="radio" name="cal-mode" value="overwrite-${esc(cal.calendar_key)}" ${dynSelectedMode === 'overwrite' && dynSelectedOverwriteKey === cal.calendar_key ? 'checked' : ''}>
+      <div>
+        <div class="cal-option-label">Overwrite: ${esc(cal.calendar_key)}</div>
+        <div class="cal-option-meta">${esc(loc)} · Modified ${cal.modified_at || cal.created_at || 'N/A'}</div>
+      </div>
+    </label>`;
+  });
+
+  optionsDiv.innerHTML = html;
+}
+
+function selectCalendarMode(mode, key) {
+  dynSelectedMode = mode;
+  dynSelectedOverwriteKey = key;
+
+  const keyInput = document.getElementById('dyn-calkey');
+  const statusEl = document.getElementById('dyn-key-status');
+  const submitBtn = document.getElementById('dyn-submit-btn');
+
+  if (mode === 'overwrite') {
+    keyInput.value = key;
+    keyInput.readOnly = true;
+    statusEl.textContent = '';
+    dynCalendarKeyValid = true;
+    submitBtn.querySelector('.btn-text').textContent = '💾 Save & Update Calendar';
+  } else {
+    currentCalendarKey = generateCalendarKey();
+    keyInput.value = currentCalendarKey;
+    keyInput.readOnly = false;
+    statusEl.textContent = '';
+    dynCalendarKeyValid = false;
+    submitBtn.querySelector('.btn-text').textContent = '📨 Generate & Send Link';
+    // Trigger uniqueness check
+    keyInput.dispatchEvent(new Event('input'));
+  }
+
+  // Update radio visual state
+  document.querySelectorAll('#dyn-cal-options .cal-option').forEach(opt => opt.classList.remove('selected'));
+  const selectedRadio = document.querySelector(`#dyn-cal-options input[value="${mode === 'overwrite' ? 'overwrite-' + key : mode}"]`);
+  if (selectedRadio) {
+    selectedRadio.checked = true;
+    selectedRadio.closest('.cal-option').classList.add('selected');
+  }
+
+  updateDynSubmitState();
 }
 
 /* ================================================================
@@ -1579,6 +2253,15 @@ async function submitDynamicCalendar(e) {
     fd.append('country', country);
     fd.append('params', JSON.stringify(params));
 
+    // Include session token if authenticated
+    const sessionToken = getSessionToken();
+    if (sessionToken) fd.append('session_token', sessionToken);
+
+    // Include overwrite key if overwriting existing calendar
+    if (dynSelectedMode === 'overwrite' && dynSelectedOverwriteKey) {
+      fd.append('overwrite_key', dynSelectedOverwriteKey);
+    }
+
     const res = await fetch(API_BASE, { method: 'POST', body: fd });
     const data = await res.json();
 
@@ -1608,9 +2291,19 @@ async function submitDynamicCalendar(e) {
       </div>`;
     document.getElementById('dyn-success').style.display = 'block';
 
-    // Store state
+    // Store state and update session calendar count
     isAuthenticated = true;
     authenticatedEmail = email;
+    if (data.session) {
+      setSessionToken(data.session.token, data.session.expires_at, email, data.user?.name, data.calendar_count);
+    } else {
+      const sd = getSessionData();
+      if (sd) {
+        sd.calendar_count = (sd.calendar_count || 0) + 1;
+        localStorage.setItem('sc-session', JSON.stringify(sd));
+        updateAccountUI();
+      }
+    }
 
   } catch (err) {
     errEl.textContent = 'Network error. Please check your connection and try again.';
@@ -1655,8 +2348,8 @@ function showOTPModal(maskedEmail, calKey) {
   document.getElementById('otp-overlay').style.display = 'flex';
   document.getElementById('otp-overlay').dataset.calKey = calKey;
   document.getElementById('otp-code').focus();
-  startOTPCountdown(600); // 10 minutes
-  startResendCooldown(60); // 60 seconds
+  startOTPCountdown(100); // 100 seconds
+  startResendCooldown(30); // 30 seconds
 }
 
 function closeOTPModal() {
@@ -1714,8 +2407,8 @@ async function resendOTP() {
     const data = await res.json();
 
     if (data.success) {
-      startOTPCountdown(600);
-      startResendCooldown(60);
+      startOTPCountdown(100);
+      startResendCooldown(30);
       document.getElementById('otp-error').style.display = 'none';
     } else {
       const errEl = document.getElementById('otp-error');
@@ -1764,6 +2457,11 @@ async function verifyOTP() {
     authenticatedEmail = data.user?.email || '';
     closeOTPModal();
 
+    // Store session if returned
+    if (data.session) {
+      setSessionToken(data.session.token, data.session.expires_at, authenticatedEmail, data.user?.name, data.calendar_count);
+    }
+
     if (data.params) {
       populateFormFromCalendar(data.params);
     }
@@ -1809,11 +2507,24 @@ async function checkExistingCalendar() {
     // Switch to feed tab
     switchTab('feed');
 
-    // Show login prompt (user needs to authenticate to modify)
-    document.getElementById('login-prompt').style.display = 'block';
-    document.getElementById('login-prompt-desc').textContent =
-      `This calendar is owned by ${data.owner_email || 'a registered user'}. To modify its settings, please verify your identity by clicking the button below.`;
-    document.getElementById('dyn-form-wrap').style.display = 'none';
+    // Check if current session owns this calendar
+    const sessionData = getSessionData();
+    if (sessionData && sessionData.email && data.owner_email === sessionData.email) {
+      // User is already signed in and owns this calendar — show edit form directly
+      isAuthenticated = true;
+      authenticatedEmail = sessionData.email;
+      document.getElementById('login-prompt').style.display = 'none';
+      document.getElementById('dyn-form-wrap').style.display = 'block';
+      document.getElementById('dyn-email').value = authenticatedEmail;
+      document.getElementById('dyn-email').readOnly = true;
+      document.getElementById('dyn-submit-btn').querySelector('.btn-text').textContent = '💾 Save Changes & Send Link';
+    } else {
+      // Show login prompt (user needs to authenticate to modify)
+      document.getElementById('login-prompt').style.display = 'block';
+      document.getElementById('login-prompt-desc').textContent =
+        `This calendar is owned by ${data.owner_email || 'a registered user'}. To modify its settings, please verify your identity by clicking the button below.`;
+      document.getElementById('dyn-form-wrap').style.display = 'none';
+    }
 
   } catch (err) {
     console.error('Failed to load calendar:', err);
@@ -1892,6 +2603,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   window.addEventListener('resize', () => { if (activeTab === 'map') map.invalidateSize(); });
 
+  // Check for magic link token in URL
+  handleMagicLinkToken();
+
+  // Check existing session
+  checkSessionOnLoad();
+
   // Load saved settings or fallback to IP / London
   initDefaultLoc();
 
@@ -1902,10 +2619,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('otp-overlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeOTPModal();
   });
-  // OTP modal: close on Escape
+  // Auth modal: close on overlay click
+  document.getElementById('auth-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeAuthModal();
+  });
+  // Modals: close on Escape
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && document.getElementById('otp-overlay').style.display !== 'none') {
-      closeOTPModal();
+    if (e.key === 'Escape') {
+      if (document.getElementById('auth-overlay').style.display !== 'none') {
+        closeAuthModal();
+      }
+      if (document.getElementById('otp-overlay').style.display !== 'none') {
+        closeOTPModal();
+      }
     }
   });
   // OTP input: auto-submit on 6 digits
@@ -1913,6 +2639,66 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
     if (e.target.value.length === 6) verifyOTP();
   });
+  // Auth OTP input: auto-submit on 6 digits
+  const authOtpInput = document.getElementById('auth-otp-code');
+  if (authOtpInput) {
+    authOtpInput.addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
+      if (e.target.value.length === 6) verifyAuthOTP();
+    });
+  }
+  // Calendar key input: real-time uniqueness check
+  const keyInput = document.getElementById('dyn-calkey');
+  if (keyInput) {
+    keyInput.addEventListener('input', () => {
+      clearTimeout(dynCalKeyCheckTimer);
+      const key = keyInput.value.trim();
+      const statusEl = document.getElementById('dyn-key-status');
+
+      if (!key || key.length < 6) {
+        statusEl.textContent = key ? 'Calendar ID must be at least 6 characters' : '';
+        statusEl.className = 'key-status invalid';
+        dynCalendarKeyValid = false;
+        updateDynSubmitState();
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9]+$/.test(key)) {
+        statusEl.textContent = 'Only letters and numbers allowed';
+        statusEl.className = 'key-status invalid';
+        dynCalendarKeyValid = false;
+        updateDynSubmitState();
+        return;
+      }
+
+      statusEl.textContent = 'Checking availability…';
+      statusEl.className = 'key-status checking';
+
+      dynCalKeyCheckTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`${API_BASE}?action=check-calendar-key&key=${encodeURIComponent(key)}`);
+          const data = await res.json();
+
+          if (data.success) {
+            if (data.exists) {
+              statusEl.textContent = '✗ This Calendar ID is already taken';
+              statusEl.className = 'key-status invalid';
+              dynCalendarKeyValid = false;
+            } else {
+              statusEl.textContent = '✓ Available';
+              statusEl.className = 'key-status valid';
+              dynCalendarKeyValid = true;
+            }
+          }
+        } catch(e) {
+          statusEl.textContent = 'Could not verify';
+          statusEl.className = 'key-status checking';
+          dynCalendarKeyValid = false;
+        }
+        updateDynSubmitState();
+      }, 400);
+    });
+  }
 });
 </script>
 </body>

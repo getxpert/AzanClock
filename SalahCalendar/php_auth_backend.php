@@ -81,7 +81,7 @@ class OTPService {
     public static function storeCode($email, $code) {
         $db = Database::getConnection();
 
-        $expiry = date("Y-m-d H:i:s", time() + 300); // 5 minutes
+        $expiry = date("Y-m-d H:i:s", time() + 100); // 100 seconds
 
         $stmt = $db->prepare("INSERT INTO email_otps (email, code, expiry)
         VALUES (?, ?, ?)");
@@ -113,7 +113,7 @@ class OTPService {
             <div style='background:#eaf0e6;border-radius:10px;padding:20px;text-align:center;margin:20px 0;'>
                 <span style='font-family:monospace;font-size:32px;font-weight:bold;color:#1B7A56;letter-spacing:6px;'>$code</span>
             </div>
-            <p style='color:#666;font-size:13px;'>This code expires in 5 minutes.</p>
+            <p style='color:#666;font-size:13px;'>This code expires in 100 seconds.</p>
         </div>";
 
         return $emailService->sendEmail($email, $subject, $htmlBody);
