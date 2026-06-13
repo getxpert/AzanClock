@@ -101,3 +101,14 @@ CREATE TABLE IF NOT EXISTS password_resets (
   INDEX idx_token (token),
   INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── New Table: otp_rate_limits ─────────────────────────────
+-- Rate limit tracking for OTP sends
+CREATE TABLE IF NOT EXISTS otp_rate_limits (
+  email VARCHAR(255) PRIMARY KEY,
+  attempts INT DEFAULT 0,
+  block_level INT DEFAULT 0,
+  blocked_until DATETIME NULL,
+  last_attempt_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

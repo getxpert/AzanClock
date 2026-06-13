@@ -690,7 +690,7 @@ select.inp {
     <img src="assets/icon.png" alt="SalahCalendar" class="brand-icon">
     <span class="brand-name">SalahCalendar</span>
     <div class="app-version">
-      <span class="v-num">v2.1.1</span>
+      <span class="v-num">v2.1.2</span>
       <span class="v-date">Compiled: 13 Jun 2026</span>
     </div>
   </div>
@@ -1042,61 +1042,102 @@ select.inp {
     <div id="auth-overlay" class="auth-overlay" style="display:none;">
       <div class="auth-modal">
         <button class="auth-close" onclick="closeAuthModal()" title="Close">✕</button>
-        <h3>🔐 Sign In to Salah Calendar</h3>
-        <p class="auth-desc">Access your saved calendars and manage your prayer time subscriptions.</p>
-
-        <div class="auth-method-toggle" id="auth-method-toggle-container">
-          <button id="auth-method-otp" class="active" onclick="switchAuthMethod('otp')">🔑 OTP Code</button>
-          <button id="auth-method-link" onclick="switchAuthMethod('link')">🔗 Email Link</button>
-          <button id="auth-method-pwd" onclick="switchAuthMethod('pwd')">🔑 Password</button>
-        </div>
+        <h3 id="auth-title">🔐 Sign In or Register</h3>
+        <p class="auth-desc" id="auth-desc">Enter your email to continue.</p>
 
         <p class="auth-error" id="auth-error"></p>
         <div class="auth-success" id="auth-success" style="display:none; margin-bottom:1rem; margin-top:0;"></div>
 
-        <!-- Email input (shared) -->
-        <div class="field" id="auth-email-field">
-          <label class="lbl" for="auth-email">Email Address</label>
-          <input id="auth-email" class="inp" type="email" placeholder="your@email.com" autocomplete="email">
+        <!-- Step 1: Email -->
+        <div id="auth-step-email">
+          <div class="field" id="auth-email-field">
+            <label class="lbl" for="auth-email">Email Address</label>
+            <input id="auth-email" class="inp" type="email" placeholder="your@email.com" autocomplete="email">
+          </div>
+          <button class="dyn-submit" id="auth-next-btn" onclick="authNextStep()" style="margin-top:1rem;width:100%;">
+            <span class="btn-text">Next</span>
+            <span class="spinner"></span>
+          </button>
         </div>
 
-        <!-- Password section -->
-        <div id="auth-password-section" style="display:none; margin-bottom: 0.85rem;">
-          <div class="field" id="auth-pwd-field">
-            <label class="lbl" id="auth-pwd-label" for="auth-pwd">Password</label>
-            <input id="auth-pwd" class="inp" type="password" placeholder="••••••••">
+        <!-- Step 2A: Login -->
+        <div id="auth-step-login" style="display:none;">
+          <div class="field">
+            <label class="lbl" for="auth-login-pwd">Password</label>
+            <input id="auth-login-pwd" class="inp" type="password" placeholder="••••••••">
           </div>
-          <div style="font-size:0.82rem; margin-top:0.5rem; display:flex; justify-content:space-between;" id="auth-pwd-links">
-            <a href="#" onclick="togglePwdMode(); return false;" id="auth-pwd-toggle-link" style="color:var(--primary); text-decoration:none;">Create Account</a>
-            <a href="#" onclick="forgotPwdMode(); return false;" id="auth-pwd-forgot-link" style="color:var(--muted); text-decoration:none;">Forgot Password?</a>
+          <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+            <button class="dyn-submit" onclick="authLoginWithPassword()" style="flex:1;">
+              <span class="btn-text">Sign In</span>
+              <span class="spinner"></span>
+            </button>
+            <button class="btn btn-ghost" onclick="authSendOTP(false)" style="flex:1; justify-content:center;">
+              Send OTP
+            </button>
+          </div>
+          <div style="text-align:center; margin-top:0.5rem;">
+            <a href="#" onclick="authBackToEmail(); return false;" style="font-size:0.8rem; color:var(--muted);">Back</a>
           </div>
         </div>
 
-        <!-- OTP section -->
-        <div id="auth-otp-section" style="display:none;">
+        <!-- Step 2B: Register -->
+        <div id="auth-step-register" style="display:none;">
+          <div class="dyn-form">
+            <div class="field">
+              <label class="lbl" for="auth-reg-name">Full Name</label>
+              <input id="auth-reg-name" class="inp" type="text" placeholder="John Doe">
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label class="lbl" for="auth-reg-city">City</label>
+                <input id="auth-reg-city" class="inp" type="text" placeholder="London">
+              </div>
+              <div class="field">
+                <label class="lbl" for="auth-reg-country">Country</label>
+                <input id="auth-reg-country" class="inp" type="text" placeholder="UK">
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl" for="auth-reg-phone">Phone (Optional)</label>
+              <input id="auth-reg-phone" class="inp" type="tel" placeholder="+44...">
+            </div>
+            <div class="field">
+              <label class="lbl" for="auth-reg-pwd">Password</label>
+              <input id="auth-reg-pwd" class="inp" type="password" placeholder="••••••••">
+            </div>
+          </div>
+          <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
+            <button class="dyn-submit" onclick="authRegisterWithPassword()" style="flex:1; padding:0.6rem 0.5rem; font-size:0.85rem;">
+              <span class="btn-text">Register with Password</span>
+              <span class="spinner"></span>
+            </button>
+            <button class="btn btn-ghost" onclick="authSendOTP(true)" style="flex:1; justify-content:center; padding:0.6rem 0.5rem; font-size:0.85rem;">
+              Send OTP
+            </button>
+          </div>
+          <div style="text-align:center; margin-top:0.5rem;">
+            <a href="#" onclick="authBackToEmail(); return false;" style="font-size:0.8rem; color:var(--muted);">Back</a>
+          </div>
+        </div>
+
+        <!-- Step 3: OTP -->
+        <div id="auth-step-otp" style="display:none;">
           <div class="otp-email-note" style="margin-bottom:1rem;">
             📬 An OTP has been sent to <strong id="auth-otp-masked-email">—</strong>. Check your inbox and spam folder.
           </div>
           <div class="otp-input-row">
             <input class="otp-input" id="auth-otp-code" type="text" maxlength="6" placeholder="000000" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code">
-            <button class="otp-verify-btn" id="auth-otp-verify-btn" onclick="verifyAuthOTP()">Verify</button>
+            <button class="otp-verify-btn" id="auth-otp-verify-btn" onclick="authVerifyOTP()">Verify</button>
           </div>
           <div class="otp-footer">
             <span class="otp-countdown">Expires in: <span id="auth-otp-timer">1:40</span></span>
-            <button class="otp-resend" id="auth-otp-resend" onclick="resendAuthOTP()" disabled>Resend OTP</button>
+            <button class="otp-resend" id="auth-otp-resend" onclick="authSendOTP(authIsRegistering)" disabled>Resend OTP</button>
+          </div>
+          <div style="text-align:center; margin-top:1rem;">
+            <a href="#" onclick="authBackToEmail(); return false;" style="font-size:0.8rem; color:var(--muted);">Back to Email</a>
           </div>
         </div>
 
-        <!-- Send button (for email entry step) -->
-        <button class="dyn-submit" id="auth-send-btn" onclick="sendAuthAction()" style="margin-top:1rem;width:100%;">
-          <span class="btn-text" id="auth-send-text">Send OTP Code</span>
-          <span class="spinner"></span>
-        </button>
-
-        <!-- Magic link success message -->
-        <div class="auth-success" id="auth-link-success">
-          ✅ A sign-in link has been sent to your email. Please check your inbox and click the link to sign in. The link expires in 24 hours.
-        </div>
       </div>
     </div>
 
@@ -1306,26 +1347,23 @@ async function signOut() {
 /* ================================================================
    Auth Modal — Sign In via OTP or Magic Link
 ================================================================ */
-let authMode = 'otp'; // 'otp', 'link', 'pwd'
-let authPwdMode = 'login'; // 'login', 'signup', 'forgot', 'reset'
+let authStep = 'email'; // 'email', 'login', 'register', 'otp'
+let authIsRegistering = false;
 let authOTPCountdownInterval = null;
 let authOTPResendCooldown = null;
 let authEmail = '';
 
-function showAuthModal(mode) {
+function showAuthModal() {
   closeAccountMenu();
-  authMode = mode || 'pwd';
-  switchAuthMethod(authMode);
+  authStep = 'email';
   document.getElementById('auth-overlay').style.display = 'flex';
   document.getElementById('auth-email').value = '';
-  if(document.getElementById('auth-pwd')) document.getElementById('auth-pwd').value = '';
-  document.getElementById('auth-email').focus();
   document.getElementById('auth-error').style.display = 'none';
   if(document.getElementById('auth-success')) document.getElementById('auth-success').style.display = 'none';
-  document.getElementById('auth-otp-section').style.display = 'none';
-  document.getElementById('auth-email-field').style.display = 'block';
-  document.getElementById('auth-send-btn').style.display = 'flex';
-  document.getElementById('auth-link-success').style.display = 'none';
+  document.getElementById('auth-title').textContent = '🔐 Sign In or Register';
+  document.getElementById('auth-desc').textContent = 'Enter your email to continue.';
+  showAuthStep('email');
+  document.getElementById('auth-email').focus();
 }
 
 function closeAuthModal() {
@@ -1334,105 +1372,30 @@ function closeAuthModal() {
   if (authOTPResendCooldown) clearInterval(authOTPResendCooldown);
 }
 
-function switchAuthMethod(mode) {
-  authMode = mode;
-  document.getElementById('auth-method-otp').classList.toggle('active', mode === 'otp');
-  document.getElementById('auth-method-link').classList.toggle('active', mode === 'link');
-  const pwdBtn = document.getElementById('auth-method-pwd');
-  if (pwdBtn) pwdBtn.classList.toggle('active', mode === 'pwd');
-  
-  if (mode === 'pwd') {
-    if (authPwdMode !== 'reset') authPwdMode = 'login';
-    updatePwdUI();
-  } else {
-    document.getElementById('auth-send-text').textContent = mode === 'otp' ? 'Send OTP Code' : 'Send Sign-In Link';
-  }
-  
-  // Reset state
-  document.getElementById('auth-otp-section').style.display = 'none';
-  const pwdSect = document.getElementById('auth-password-section');
-  if (pwdSect) pwdSect.style.display = (mode === 'pwd' && authPwdMode !== 'forgot') ? 'block' : 'none';
-  document.getElementById('auth-email-field').style.display = (mode === 'pwd' && authPwdMode === 'reset') ? 'none' : 'block';
-  document.getElementById('auth-send-btn').style.display = 'flex';
-  document.getElementById('auth-link-success').style.display = 'none';
+function showAuthStep(step) {
+  authStep = step;
+  document.getElementById('auth-step-email').style.display = (step === 'email') ? 'block' : 'none';
+  document.getElementById('auth-step-login').style.display = (step === 'login') ? 'block' : 'none';
+  document.getElementById('auth-step-register').style.display = (step === 'register') ? 'block' : 'none';
+  document.getElementById('auth-step-otp').style.display = (step === 'otp') ? 'block' : 'none';
   document.getElementById('auth-error').style.display = 'none';
-  if(document.getElementById('auth-success')) document.getElementById('auth-success').style.display = 'none';
 }
 
-function togglePwdMode() {
-  if (authPwdMode === 'reset') {
-    authPwdMode = 'login';
-    document.getElementById('auth-email-field').style.display = 'block';
-  } else {
-    authPwdMode = authPwdMode === 'login' ? 'signup' : 'login';
-  }
-  updatePwdUI();
+function authBackToEmail() {
+  document.getElementById('auth-title').textContent = '🔐 Sign In or Register';
+  document.getElementById('auth-desc').textContent = 'Enter your email to continue.';
+  showAuthStep('email');
 }
 
-function forgotPwdMode() {
-  authPwdMode = 'forgot';
-  updatePwdUI();
-}
-
-function updatePwdUI() {
-  const lbl = document.getElementById('auth-pwd-label');
-  const link = document.getElementById('auth-pwd-toggle-link');
-  const forgot = document.getElementById('auth-pwd-forgot-link');
-  const pwdSect = document.getElementById('auth-password-section');
-  const btnText = document.getElementById('auth-send-text');
-  const emailField = document.getElementById('auth-email-field');
-  const authToggleContainer = document.getElementById('auth-method-toggle-container');
-  
-  if(document.getElementById('auth-success')) document.getElementById('auth-success').style.display = 'none';
-  document.getElementById('auth-error').style.display = 'none';
-  
-  if (authPwdMode === 'reset') {
-    authToggleContainer.style.display = 'none';
-  } else {
-    authToggleContainer.style.display = 'flex';
-  }
-  
-  if (authPwdMode === 'login') {
-    pwdSect.style.display = 'block';
-    emailField.style.display = 'block';
-    lbl.textContent = 'Password';
-    link.textContent = 'Create Account';
-    forgot.style.display = 'inline';
-    btnText.textContent = 'Sign In';
-  } else if (authPwdMode === 'signup') {
-    pwdSect.style.display = 'block';
-    emailField.style.display = 'block';
-    lbl.textContent = 'Create Password';
-    link.textContent = 'Already have an account? Sign In';
-    forgot.style.display = 'none';
-    btnText.textContent = 'Create Account';
-  } else if (authPwdMode === 'forgot') {
-    pwdSect.style.display = 'none';
-    emailField.style.display = 'block';
-    btnText.textContent = 'Send Reset Link';
-    // When in forgot mode, we might want a back button, but clicking the tabs also works
-  } else if (authPwdMode === 'reset') {
-    pwdSect.style.display = 'block';
-    emailField.style.display = 'none';
-    lbl.textContent = 'New Password';
-    link.textContent = 'Back to Sign In';
-    forgot.style.display = 'none';
-    btnText.textContent = 'Reset Password';
-  }
-}
-
-async function sendAuthAction() {
+async function authNextStep() {
   const email = document.getElementById('auth-email').value.trim();
-  const pwd = document.getElementById('auth-pwd') ? document.getElementById('auth-pwd').value : '';
   const errEl = document.getElementById('auth-error');
-  const btn = document.getElementById('auth-send-btn');
+  const btn = document.getElementById('auth-next-btn');
 
-  if (authMode !== 'pwd' || authPwdMode !== 'reset') {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errEl.textContent = 'Please enter a valid email address.';
-      errEl.style.display = 'block';
-      return;
-    }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
   }
 
   errEl.style.display = 'none';
@@ -1442,106 +1405,29 @@ async function sendAuthAction() {
 
   try {
     const fd = new FormData();
-
-    if (authMode === 'pwd') {
-      if (authPwdMode === 'login') {
-        if (!pwd) { errEl.textContent = 'Please enter your password.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
-        fd.append('action', 'login-password');
-        fd.append('email', email);
-        fd.append('password', pwd);
-        const res = await fetch(API_BASE, { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!data.success) { errEl.textContent = data.message || 'Login failed.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
-        setSessionToken(data.token, data.expires_at, data.user.email, data.user.name, data.calendar_count);
-        isAuthenticated = true;
-        authenticatedEmail = data.user.email;
-        closeAuthModal();
-        if (activeTab === 'feed') {
-          const dynEmailEl = document.getElementById('dyn-email');
-          if (dynEmailEl) { dynEmailEl.value = data.user.email; dynEmailEl.readOnly = true; loadUserCalendarsForDynForm(); }
-        }
-      } else if (authPwdMode === 'signup') {
-        if (!pwd || pwd.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
-        fd.append('action', 'signup-password');
-        fd.append('email', email);
-        fd.append('password', pwd);
-        const res = await fetch(API_BASE, { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!data.success) { errEl.textContent = data.message || 'Signup failed.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
-        setSessionToken(data.token, data.expires_at, data.user.email, data.user.name, data.calendar_count);
-        isAuthenticated = true;
-        authenticatedEmail = data.user.email;
-        closeAuthModal();
-        if (activeTab === 'feed') {
-          const dynEmailEl = document.getElementById('dyn-email');
-          if (dynEmailEl) { dynEmailEl.value = data.user.email; dynEmailEl.readOnly = true; loadUserCalendarsForDynForm(); }
-        }
-      } else if (authPwdMode === 'forgot') {
-        fd.append('action', 'forgot-password');
-        fd.append('email', email);
-        const res = await fetch(API_BASE, { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!data.success) { errEl.textContent = data.message || 'Request failed.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
-        document.getElementById('auth-success').textContent = '✅ Reset link sent! Check your inbox.';
-        document.getElementById('auth-success').style.display = 'block';
-      } else if (authPwdMode === 'reset') {
-        if (!pwd || pwd.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
-        const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('reset_token');
-        fd.append('action', 'reset-password');
-        fd.append('token', token);
-        fd.append('new_password', pwd);
-        const res = await fetch(API_BASE, { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!data.success) { errEl.textContent = data.message || 'Reset failed. Token might be expired.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
-        document.getElementById('auth-success').textContent = '✅ Password reset successfully. Please sign in.';
-        document.getElementById('auth-success').style.display = 'block';
-        document.getElementById('auth-pwd').value = '';
-        authPwdMode = 'login';
-        updatePwdUI();
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    } else if (authMode === 'otp') {
-      fd.append('action', 'send-login-otp');
-      fd.append('email', email);
-
-      const res = await fetch(API_BASE, { method: 'POST', body: fd });
-      const data = await res.json();
-
-      if (!data.success) {
-        errEl.textContent = data.message || 'Failed to send OTP.';
-        errEl.style.display = 'block';
-        return;
-      }
-
-      // Show OTP input
-      document.getElementById('auth-otp-masked-email').textContent = data.masked_email || email;
-      document.getElementById('auth-otp-section').style.display = 'block';
-      document.getElementById('auth-email-field').style.display = 'none';
-      document.getElementById('auth-send-btn').style.display = 'none';
-      document.getElementById('auth-otp-code').value = '';
-      document.getElementById('auth-otp-code').focus();
-      startAuthOTPCountdown(100); // 100 seconds
-      startAuthResendCooldown(30);
-
+    fd.append('action', 'check-email');
+    fd.append('email', email);
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+    
+    if (data.exists) {
+      authIsRegistering = false;
+      document.getElementById('auth-title').textContent = '🔐 Sign In';
+      document.getElementById('auth-desc').textContent = `Welcome back, ${data.name || email}`;
+      showAuthStep('login');
+      document.getElementById('auth-login-pwd').value = '';
+      document.getElementById('auth-login-pwd').focus();
     } else {
-      // Magic link
-      fd.append('action', 'send-magic-link');
-      fd.append('email', email);
-
-      const res = await fetch(API_BASE, { method: 'POST', body: fd });
-      const data = await res.json();
-
-      if (!data.success) {
-        errEl.textContent = data.message || 'Failed to send sign-in link.';
-        errEl.style.display = 'block';
-        return;
-      }
-
-      // Show success
-      document.getElementById('auth-send-btn').style.display = 'none';
-      document.getElementById('auth-email-field').style.display = 'none';
-      document.getElementById('auth-link-success').style.display = 'block';
+      authIsRegistering = true;
+      document.getElementById('auth-title').textContent = '✨ Create Account';
+      document.getElementById('auth-desc').textContent = `Register with ${email}`;
+      showAuthStep('register');
+      document.getElementById('auth-reg-name').value = '';
+      document.getElementById('auth-reg-city').value = '';
+      document.getElementById('auth-reg-country').value = '';
+      document.getElementById('auth-reg-phone').value = '';
+      document.getElementById('auth-reg-pwd').value = '';
+      document.getElementById('auth-reg-name').focus();
     }
   } catch(e) {
     errEl.textContent = 'Network error. Please try again.';
@@ -1549,6 +1435,146 @@ async function sendAuthAction() {
   } finally {
     btn.classList.remove('loading');
     btn.disabled = false;
+  }
+}
+
+async function authLoginWithPassword() {
+  const pwd = document.getElementById('auth-login-pwd').value;
+  const errEl = document.getElementById('auth-error');
+  if (!pwd) { errEl.textContent = 'Please enter your password.'; errEl.style.display = 'block'; return; }
+  
+  const fd = new FormData();
+  fd.append('action', 'login-password');
+  fd.append('email', authEmail);
+  fd.append('password', pwd);
+  
+  await submitAuthRequest(fd);
+}
+
+async function authRegisterWithPassword() {
+  const pwd = document.getElementById('auth-reg-pwd').value;
+  const name = document.getElementById('auth-reg-name').value;
+  const phone = document.getElementById('auth-reg-phone').value;
+  const city = document.getElementById('auth-reg-city').value;
+  const country = document.getElementById('auth-reg-country').value;
+  
+  const errEl = document.getElementById('auth-error');
+  if (!pwd || pwd.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; return; }
+  
+  const fd = new FormData();
+  fd.append('action', 'signup-password');
+  fd.append('email', authEmail);
+  fd.append('password', pwd);
+  fd.append('name', name);
+  fd.append('phone', phone);
+  fd.append('city', city);
+  fd.append('country', country);
+  
+  await submitAuthRequest(fd);
+}
+
+async function submitAuthRequest(fd) {
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  try {
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.success) { errEl.textContent = data.message || 'Authentication failed.'; errEl.style.display = 'block'; return; }
+    
+    setSessionToken(data.session.token, data.session.expires_at, data.user.email, data.user.name, data.calendar_count);
+    isAuthenticated = true;
+    authenticatedEmail = data.user.email;
+    closeAuthModal();
+    if (activeTab === 'feed') {
+      await loadUserCalendarsForDynForm();
+    }
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  }
+}
+
+async function authSendOTP(isRegistering) {
+  authIsRegistering = isRegistering;
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  
+  try {
+    const fd = new FormData();
+    fd.append('action', 'send-login-otp');
+    fd.append('email', authEmail);
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.success) { errEl.textContent = data.message || 'Failed to send OTP.'; errEl.style.display = 'block'; return; }
+    
+    document.getElementById('auth-title').textContent = '🔐 Verification';
+    document.getElementById('auth-desc').textContent = 'Enter the code sent to your email';
+    document.getElementById('auth-otp-masked-email').textContent = data.masked_email || authEmail;
+    showAuthStep('otp');
+    document.getElementById('auth-otp-code').value = '';
+    document.getElementById('auth-otp-code').focus();
+    startAuthOTPCountdown(100);
+    startAuthResendCooldown(30);
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  }
+}
+
+async function authVerifyOTP() {
+  const code = document.getElementById('auth-otp-code').value.trim();
+  const errEl = document.getElementById('auth-error');
+  const btn = document.getElementById('auth-otp-verify-btn');
+
+  if (!code || code.length < 6) {
+    errEl.textContent = 'Please enter the 6-digit code.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Verifying…';
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'verify-login-otp');
+    fd.append('email', authEmail);
+    fd.append('code', code);
+    
+    if (authIsRegistering) {
+      fd.append('name', document.getElementById('auth-reg-name').value);
+      fd.append('phone', document.getElementById('auth-reg-phone').value);
+      fd.append('city', document.getElementById('auth-reg-city').value);
+      fd.append('country', document.getElementById('auth-reg-country').value);
+    }
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!data.success) {
+      errEl.textContent = data.message || 'Invalid or expired code.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Success! Store session
+    if (data.session) {
+      setSessionToken(data.session.token, data.session.expires_at, data.user.email, data.user.name, data.calendar_count);
+    }
+    isAuthenticated = true;
+    authenticatedEmail = data.user.email;
+
+    closeAuthModal();
+
+    if (activeTab === 'feed') {
+      await loadUserCalendarsForDynForm();
+    }
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Verify';
   }
 }
 
@@ -1588,76 +1614,6 @@ function startAuthResendCooldown(seconds) {
   }, 1000);
 }
 
-async function resendAuthOTP() {
-  const fd = new FormData();
-  fd.append('action', 'send-login-otp');
-  fd.append('email', authEmail);
-
-  try {
-    const res = await fetch(API_BASE, { method: 'POST', body: fd });
-    const data = await res.json();
-    if (data.success) {
-      startAuthOTPCountdown(100);
-      startAuthResendCooldown(30);
-      document.getElementById('auth-error').style.display = 'none';
-    }
-  } catch(e) {}
-}
-
-async function verifyAuthOTP() {
-  const code = document.getElementById('auth-otp-code').value.trim();
-  const errEl = document.getElementById('auth-error');
-  const btn = document.getElementById('auth-otp-verify-btn');
-
-  if (!code || code.length < 6) {
-    errEl.textContent = 'Please enter the 6-digit code.';
-    errEl.style.display = 'block';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Verifying…';
-
-  try {
-    const fd = new FormData();
-    fd.append('action', 'verify-login-otp');
-    fd.append('email', authEmail);
-    fd.append('code', code);
-
-    const res = await fetch(API_BASE, { method: 'POST', body: fd });
-    const data = await res.json();
-
-    if (!data.success) {
-      errEl.textContent = data.message || 'Invalid or expired code.';
-      errEl.style.display = 'block';
-      return;
-    }
-
-    // Success! Store session
-    if (data.session) {
-      setSessionToken(data.session.token, data.session.expires_at, data.user.email, data.user.name, data.calendar_count);
-    }
-    isAuthenticated = true;
-    authenticatedEmail = data.user.email;
-
-    closeAuthModal();
-
-    // If on feed tab, update the dynamic form
-    if (activeTab === 'feed') {
-      document.getElementById('dyn-email').value = authenticatedEmail;
-      document.getElementById('dyn-email').readOnly = true;
-      await loadUserCalendarsForDynForm();
-    }
-
-  } catch(e) {
-    errEl.textContent = 'Network error. Please try again.';
-    errEl.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Verify';
-  }
-}
-
 /* ================================================================
    Dynamic Calendar — Enhanced Flow
 ================================================================ */
@@ -1680,35 +1636,10 @@ async function checkEmailAndProceed() {
   document.getElementById('dyn-email').classList.remove('error');
   errEl.style.display = 'none';
 
-  const btn = document.getElementById('dyn-email-next-btn');
-  btn.textContent = 'Checking...';
-  btn.disabled = true;
-
-  try {
-    const fd = new FormData();
-    fd.append('action', 'check-email');
-    fd.append('email', email);
-
-    const res = await fetch(API_BASE, { method: 'POST', body: fd });
-    const data = await res.json();
-    
-    showAuthModal('pwd');
-    document.getElementById('auth-email').value = email;
-    
-    if (data.exists) {
-      authPwdMode = 'login';
-    } else {
-      authPwdMode = 'signup';
-    }
-    updatePwdUI();
-    
-  } catch(e) {
-    errEl.textContent = 'Network error. Please check your connection.';
-    errEl.style.display = 'block';
-  } finally {
-    btn.textContent = 'Next';
-    btn.disabled = false;
-  }
+  // Open Auth Modal and transition to login/register based on the email
+  showAuthModal();
+  document.getElementById('auth-email').value = email;
+  await authNextStep();
 }
 
 function updateDynSubmitState() {

@@ -37,6 +37,26 @@ function createSession($userId, $email) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   ACTION: check-email
+   Checks if an email exists in the database
+══════════════════════════════════════════════════════════════ */
+function actionCheckEmail() {
+    $email = requirePost('email');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        jsonErr('Please provide a valid email address.');
+    }
+    $db = getDB();
+    $stmt = $db->prepare('SELECT id, name FROM users WHERE email = ?');
+    $stmt->execute([$email]);
+    $user = $stmt->fetch();
+    
+    jsonOK([
+        'exists' => (bool)$user,
+        'name' => $user ? $user['name'] : ''
+    ]);
+}
+
+/* ══════════════════════════════════════════════════════════════
    ACTION: send-login-otp
    Sends OTP to an email address for standalone login
 ══════════════════════════════════════════════════════════════ */
@@ -49,6 +69,47 @@ function actionSendLoginOTP() {
     }
 
     $db = getDB();
+
+    // Rate Limiting Logic
+    $stmt = $db->prepare('SELECT * FROM otp_rate_limits WHERE email = ?');
+    $stmt->execute([$email]);
+    $rateLimit = $stmt->fetch();
+
+    $now = new DateTime();
+    
+    if ($rateLimit) {
+        if ($rateLimit['blocked_until']) {
+            $blockedUntil = new DateTime($rateLimit['blocked_until']);
+            if ($now < $blockedUntil) {
+                $diff = $blockedUntil->getTimestamp() - $now->getTimestamp();
+                jsonErr("Too many attempts. Please try again in " . ceil($diff / 60) . " minutes.", 429);
+            } else {
+                $stmt = $db->prepare('UPDATE otp_rate_limits SET attempts = 0, blocked_until = NULL WHERE email = ?');
+                $stmt->execute([$email]);
+                $rateLimit['attempts'] = 0;
+            }
+        }
+        
+        $attempts = $rateLimit['attempts'] + 1;
+        $blockLevel = $rateLimit['block_level'];
+        
+        if ($attempts >= 3) {
+            $blockDuration = 5; // 5 mins
+            if ($blockLevel == 1) $blockDuration = 15;
+            elseif ($blockLevel >= 2) $blockDuration = 60;
+            
+            $blockedUntil = (clone $now)->modify("+$blockDuration minutes")->format('Y-m-d H:i:s');
+            $stmt = $db->prepare('UPDATE otp_rate_limits SET attempts = ?, block_level = block_level + 1, blocked_until = ? WHERE email = ?');
+            $stmt->execute([$attempts, $blockedUntil, $email]);
+            jsonErr("Too many attempts. Please try again in $blockDuration minutes.", 429);
+        } else {
+            $stmt = $db->prepare('UPDATE otp_rate_limits SET attempts = ? WHERE email = ?');
+            $stmt->execute([$attempts, $email]);
+        }
+    } else {
+        $stmt = $db->prepare('INSERT INTO otp_rate_limits (email, attempts) VALUES (?, 1)');
+        $stmt->execute([$email]);
+    }
 
     // Generate OTP (6 digits)
     $code   = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
@@ -80,6 +141,10 @@ function actionSendLoginOTP() {
 function actionVerifyLoginOTP() {
     $email = requirePost('email');
     $code  = requirePost('code');
+    $name = optionalPost('name');
+    $phone = optionalPost('phone');
+    $city = optionalPost('city');
+    $country = optionalPost('country');
 
     // Validate email format
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -105,6 +170,10 @@ function actionVerifyLoginOTP() {
     $stmt = $db->prepare('DELETE FROM email_otps WHERE id = ?');
     $stmt->execute([$otp['id']]);
 
+    // Clear rate limits
+    $stmt = $db->prepare('DELETE FROM otp_rate_limits WHERE email = ?');
+    $stmt->execute([$email]);
+
     // Find or create user
     $stmt = $db->prepare('SELECT id, email, name FROM users WHERE email = ?');
     $stmt->execute([$email]);
@@ -115,11 +184,11 @@ function actionVerifyLoginOTP() {
     if (!$user) {
         // Create new user
         $stmt = $db->prepare(
-            'INSERT INTO users (email, auth_provider) VALUES (?, ?)'
+            'INSERT INTO users (email, auth_provider, name, phone, city, country) VALUES (?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$email, 'email']);
+        $stmt->execute([$email, 'email_otp', $name, $phone, $city, $country]);
         $userId = $db->lastInsertId();
-        $userName = '';
+        $userName = $name;
         $status = 'NEW_USER';
     } else {
         $userId   = $user['id'];
@@ -335,6 +404,9 @@ function actionSignupPassword() {
     $email    = requirePost('email');
     $password = requirePost('password');
     $name     = optionalPost('name');
+    $phone    = optionalPost('phone');
+    $city     = optionalPost('city');
+    $country  = optionalPost('country');
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         jsonErr('Please provide a valid email address.');
@@ -353,9 +425,9 @@ function actionSignupPassword() {
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
     $stmt = $db->prepare(
-        'INSERT INTO users (email, name, password_hash, auth_provider) VALUES (?, ?, ?, ?)'
+        'INSERT INTO users (email, name, phone, city, country, password_hash, auth_provider) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute([$email, $name, $hash, 'password']);
+    $stmt->execute([$email, $name, $phone, $city, $country, $hash, 'password']);
     $userId = $db->lastInsertId();
 
     $session = createSession($userId, $email);

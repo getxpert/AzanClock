@@ -217,7 +217,8 @@ function actionRegister() {
     $stmt->execute([$email, $magicToken, $magicExpiry]);
 
     // ── Build dynamic link ───────────────────────────────────
-    $dynamicLink = APP_BASE_URL . '/?cid=' . urlencode($calendarKey) . '&token=' . urlencode($magicToken);
+    // User requirement: link MUST ONLY contain the calendar id and NOT the auth token
+    $dynamicLink = APP_BASE_URL . '/?cid=' . urlencode($calendarKey);
     $calLink     = APP_BASE_URL . '/prayer.php?cid=' . urlencode($calendarKey);
     $webcalLink  = str_replace('https://', 'webcal://', $calLink);
 
