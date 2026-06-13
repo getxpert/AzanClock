@@ -690,7 +690,7 @@ select.inp {
     <img src="assets/icon.png" alt="SalahCalendar" class="brand-icon">
     <span class="brand-name">SalahCalendar</span>
     <div class="app-version">
-      <span class="v-num">v2.1.0</span>
+      <span class="v-num">v2.1.1</span>
       <span class="v-date">Compiled: 13 Jun 2026</span>
     </div>
   </div>
@@ -808,7 +808,7 @@ select.inp {
 
           <div class="field">
             <label class="lbl" for="tz-in">Timezone</label>
-            <input id="tz-in" class="inp" type="text" placeholder="e.g. Europe/London" oninput="onSettingsChange()">
+            <select id="tz-in" class="inp" onchange="onSettingsChange()"></select>
             <span class="hint">IANA format — auto-detected from your browser</span>
           </div>
 
@@ -2062,6 +2062,32 @@ const PI = {
   midnight:{key:'midnight',en:'Midnight',ar:'منتصف الليل'},
 };
 
+function setTzDropdown(targetTz) {
+  if (!targetTz) return;
+  const tzSelect = document.getElementById('tz-in');
+  if (!tzSelect) return;
+  for (let i=0; i<tzSelect.options.length; i++) {
+    if (tzSelect.options[i].value === targetTz) {
+      tzSelect.selectedIndex = i;
+      S.tz = tzSelect.value;
+      return;
+    }
+  }
+  try {
+    const d = new Date();
+    const targetOffsetStr = new Intl.DateTimeFormat('en-US', { timeZone: targetTz, timeZoneName: 'longOffset' }).format(d);
+    const match = targetOffsetStr.match(/GMT([+-]\d{2}:\d{2})?/);
+    const searchOffset = match ? (match[0] || 'GMT') : 'GMT';
+    for (let i=0; i<tzSelect.options.length; i++) {
+      if (tzSelect.options[i].text.startsWith(`(${searchOffset})`)) {
+        tzSelect.selectedIndex = i;
+        S.tz = tzSelect.value;
+        return;
+      }
+    }
+  } catch(e) {}
+}
+
 function saveSettings() {
   if(!S.lat || !S.lng) return;
   const set = {
@@ -2083,7 +2109,7 @@ function loadSettings() {
     if(txt) {
       const set = JSON.parse(txt);
       if(set.lat) {
-        document.getElementById('tz-in').value = set.tz;
+        setTzDropdown(set.tz);
         document.getElementById('method').value = set.method;
         document.getElementById('asr-m').value = set.asr;
         document.getElementById('sl-before').value = set.before;
@@ -2112,7 +2138,7 @@ async function initDefaultLoc() {
     if(res.ok) {
       const d = await res.json();
       if(d.latitude && d.longitude) {
-        document.getElementById('tz-in').value = d.timezone || S.tz;
+        setTzDropdown(d.timezone || S.tz);
         S.city = d.city || '';
         S.country = d.country_name || '';
         setLoc(d.latitude, d.longitude, d.city, true);
@@ -2123,7 +2149,7 @@ async function initDefaultLoc() {
   } catch(e){}
   
   // Fallback to London Unified Timetable defaults
-  document.getElementById('tz-in').value = 'Europe/London';
+  setTzDropdown('Europe/London');
   setLoc(51.5074, -0.1278, 'London', true);
   autoMethodByLocation('London');
 }
@@ -2174,6 +2200,18 @@ async function revGeo(lat,lng){
     S.city = d.address?.city || d.address?.town || d.address?.village || '';
     S.country = d.address?.country || '';
     autoMethodByLocation(d.display_name || d.address?.country || '');
+    
+    // Auto-detect timezone
+    try {
+      const tzRes = await fetch(`https://timeapi.io/api/TimeZone/coordinate?latitude=${lat}&longitude=${lng}`);
+      if (tzRes.ok) {
+        const tzData = await tzRes.json();
+        if (tzData.timeZone) {
+          setTzDropdown(tzData.timeZone);
+          onSettingsChange(true);
+        }
+      }
+    } catch(e) {}
   }catch(e){}
 }
 
@@ -2794,7 +2832,7 @@ function populateFormFromCalendar(params) {
   }
   if (params.method) document.getElementById('method').value = params.method;
   if (params.asr) document.getElementById('asr-m').value = params.asr;
-  if (params.tz) document.getElementById('tz-in').value = params.tz;
+  if (params.tz) setTzDropdown(params.tz);
   if (params.before !== undefined) { document.getElementById('sl-before').value = params.before; updSlider('before', false); }
   if (params.after !== undefined) { document.getElementById('sl-after').value = params.after; updSlider('after', false); }
   if (params.hours_before !== undefined) document.getElementById('d-before').value = Math.round(params.hours_before / 24);
@@ -2849,11 +2887,73 @@ async function cpURL(sid, fbid) {
 /* ================================================================
    Init
 ================================================================ */
+function populateTimezones() {
+  const tzSelect = document.getElementById('tz-in');
+  if (Intl && Intl.supportedValuesOf) {
+    const timezones = Intl.supportedValuesOf('timeZone');
+    const now = new Date();
+    
+    const FAMOUS_CITIES = new Set([
+      'London','Paris','Berlin','Rome','Madrid','Amsterdam','Brussels','Vienna','Stockholm','Oslo','Copenhagen','Helsinki','Moscow','Kyiv','Athens','Istanbul',
+      'Dubai','Riyadh','Baghdad','Tehran','Karachi','Mumbai','Kolkata','Dhaka','Bangkok','Jakarta','Singapore','Kuala Lumpur','Manila','Tokyo','Seoul','Beijing','Shanghai','Hong Kong','Taipei',
+      'Sydney','Melbourne','Brisbane','Auckland','Fiji','Honolulu','Anchorage','Los Angeles','San Francisco','Vancouver','Denver','Phoenix','Chicago','Houston','Mexico City','New York','Toronto','Montreal','Havana',
+      'Bogota','Lima','Caracas','Santiago','Buenos Aires','Sao Paulo','Rio de Janeiro',
+      'Dakar','Casablanca','Cairo','Lagos','Nairobi','Addis Ababa','Johannesburg','Cape Town','Lahore','Islamabad','Makkah','Jeddah','Kuwait','Doha','Amman','Kabul','Tashkent','Almaty','Kathmandu','Yangon'
+    ]);
+    
+    const groups = new Map();
+    timezones.forEach(tz => {
+      let offsetStr = 'GMT';
+      let offsetVal = 0;
+      try {
+        const tzStr = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' }).format(now);
+        const match = tzStr.match(/GMT([+-]\d{2}:\d{2})?/);
+        if (match) {
+          offsetStr = match[0] || 'GMT';
+          if (match[1]) {
+            const parts = match[1].split(':');
+            offsetVal = parseInt(parts[0]) * 60 + (parts[0].startsWith('-') ? -parseInt(parts[1]) : parseInt(parts[1]));
+          }
+        }
+      } catch(e) {}
+      
+      const parts = tz.split('/');
+      const city = (parts[parts.length - 1] || tz).replace(/_/g, ' ');
+      
+      if (!groups.has(offsetVal)) {
+        groups.set(offsetVal, { offsetStr, offsetVal, firstTz: tz, cities: [], allTz: [] });
+      }
+      const group = groups.get(offsetVal);
+      group.allTz.push(tz);
+      if (!group.cities.includes(city)) group.cities.push(city);
+    });
+
+    const sortedGroups = Array.from(groups.values()).sort((a, b) => a.offsetVal - b.offsetVal);
+    
+    const options = sortedGroups.map(g => {
+      let filtered = g.cities.filter(c => FAMOUS_CITIES.has(c));
+      if (filtered.length === 0) filtered = g.cities.slice(0, 2); // Fallback to first 2 if none are famous
+      
+      let cityList = filtered.slice(0, 4).join(', ');
+      if (g.cities.length > filtered.slice(0, 4).length) cityList += ', ...';
+      
+      return `<option value="${g.firstTz}">(${g.offsetStr}) ${cityList}</option>`;
+    }).join('');
+
+    tzSelect.innerHTML = options;
+
+    setTzDropdown(S.tz || 'Europe/London');
+  } else {
+    tzSelect.innerHTML = `<option value="${S.tz || 'Europe/London'}">${S.tz || 'Europe/London'}</option>`;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  populateTimezones();
   applyTheme(getTheme());
   initMap();
 
-  document.getElementById('tz-in').value = S.tz;
+  setTzDropdown(S.tz);
   updSlider('before', false); updSlider('after', false);
 
   const isPortrait = () => window.innerHeight > window.innerWidth;
