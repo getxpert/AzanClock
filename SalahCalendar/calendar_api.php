@@ -23,6 +23,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/BrevoEmailService.php';
+require_once __DIR__ . '/auth_api.php';
 
 /* ══════════════════════════════════════════════════════════════
    CORS & Preflight
@@ -82,41 +83,7 @@ function maskEmail($email) {
     return $local[0] . str_repeat('*', min(strlen($local) - 2, 4)) . substr($local, -1) . '@' . $domain;
 }
 
-/* ── Session & Token Helpers ─────────────────────────────────── */
 
-function generateToken($length = 64) {
-    return bin2hex(random_bytes($length));
-}
-
-function validateSession() {
-    $token = isset($_POST['session_token']) ? trim($_POST['session_token']) :
-             (isset($_GET['session_token']) ? trim($_GET['session_token']) : '');
-    if ($token === '') return null;
-
-    $db = getDB();
-    $stmt = $db->prepare(
-        'SELECT us.user_id, us.email, u.name, us.expires_at
-         FROM user_sessions us
-         JOIN users u ON u.id = us.user_id
-         WHERE us.session_token = ? AND us.expires_at > NOW()'
-    );
-    $stmt->execute([$token]);
-    return $stmt->fetch();
-}
-
-function createSession($userId, $email) {
-    $db = getDB();
-    $token = generateToken();
-    $expiresAt = date('Y-m-d H:i:s', time() + 86400); // 24 hours
-
-    $stmt = $db->prepare(
-        'INSERT INTO user_sessions (user_id, session_token, email, expires_at)
-         VALUES (?, ?, ?, ?)'
-    );
-    $stmt->execute([$userId, $token, $email, $expiresAt]);
-
-    return ['token' => $token, 'expires_at' => $expiresAt];
-}
 
 /* ══════════════════════════════════════════════════════════════
    ACTION: register
@@ -194,6 +161,9 @@ function actionRegister() {
 
     // ── Overwrite existing calendar if requested ─────────────
     if ($overwriteKey !== '') {
+        if (!$session) {
+            jsonErr('Unauthorized: valid session required to overwrite calendar.', 401);
+        }
         $stmt = $db->prepare(
             'SELECT id, user_id FROM salah_calendars WHERE calendar_key = ?'
         );
@@ -215,6 +185,14 @@ function actionRegister() {
 
         $calendarKey = $overwriteKey;
     } else {
+        // ── Limit calendars to 5 per user ────────────────────
+        $stmt = $db->prepare('SELECT COUNT(*) AS cnt FROM salah_calendars WHERE user_id = ?');
+        $stmt->execute([$userId]);
+        $calendarCount = (int)$stmt->fetch()['cnt'];
+        if ($calendarCount >= 5) {
+            jsonErr('Maximum limit of 5 calendars reached.');
+        }
+
         // ── Check for duplicate calendar key ─────────────────
         $stmt = $db->prepare('SELECT id FROM salah_calendars WHERE calendar_key = ?');
         $stmt->execute([$calendarKey]);
@@ -239,7 +217,7 @@ function actionRegister() {
     $stmt->execute([$email, $magicToken, $magicExpiry]);
 
     // ── Build dynamic link ───────────────────────────────────
-    $dynamicLink = APP_BASE_URL . '/SalahCalendar/?cid=' . urlencode($calendarKey) . '&token=' . urlencode($magicToken);
+    $dynamicLink = APP_BASE_URL . '/?cid=' . urlencode($calendarKey) . '&token=' . urlencode($magicToken);
     $calLink     = APP_BASE_URL . '/prayer.php?cid=' . urlencode($calendarKey);
     $webcalLink  = str_replace('https://', 'webcal://', $calLink);
 
@@ -452,316 +430,41 @@ function actionUpdateCalendar() {
     jsonOK(['calendar_key' => $calendarKey, 'updated' => true]);
 }
 
-/* ══════════════════════════════════════════════════════════════
-   ACTION: send-login-otp
-   Sends OTP to an email address for standalone login
-══════════════════════════════════════════════════════════════ */
-function actionSendLoginOTP() {
-    $email = requirePost('email');
 
-    // Validate email format
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        jsonErr('Please provide a valid email address.');
-    }
-
-    $db = getDB();
-
-    // Generate OTP (6 digits)
-    $code   = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-    $expiry = date('Y-m-d H:i:s', time() + 100); // 100 seconds
-
-    $stmt = $db->prepare('INSERT INTO email_otps (email, code, expiry) VALUES (?, ?, ?)');
-    $stmt->execute([$email, $code, $expiry]);
-
-    // Check if user already exists
-    $stmt = $db->prepare('SELECT id, name FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-
-    // Send OTP email
-    $emailService = new BrevoEmailService(BREVO_API_KEY);
-    $htmlBody = buildOTPEmailHTML($code, $user ? ($user['name'] ?: '') : '');
-    $emailService->sendEmail($email, 'Your Salah Calendar Verification Code', $htmlBody, $user ? ($user['name'] ?: '') : '');
-
-    jsonOK([
-        'user_exists'  => (bool)$user,
-        'masked_email' => maskEmail($email),
-    ]);
-}
 
 /* ══════════════════════════════════════════════════════════════
-   ACTION: verify-login-otp
-   Verifies standalone login OTP and creates session
+   ACTION: delete-calendar
+   Deletes a calendar (requires valid session and ownership)
 ══════════════════════════════════════════════════════════════ */
-function actionVerifyLoginOTP() {
-    $email = requirePost('email');
-    $code  = requirePost('code');
+function actionDeleteCalendar() {
+    $calendarKey = requirePost('calendar_key');
 
-    // Validate email format
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        jsonErr('Please provide a valid email address.');
-    }
-
-    $db = getDB();
-
-    // Verify OTP
-    $stmt = $db->prepare(
-        'SELECT id FROM email_otps
-         WHERE email = ? AND code = ? AND expiry > NOW()
-         ORDER BY created_at DESC LIMIT 1'
-    );
-    $stmt->execute([$email, $code]);
-    $otp = $stmt->fetch();
-
-    if (!$otp) {
-        jsonErr('Invalid or expired verification code.', 401);
-    }
-
-    // Delete used OTP
-    $stmt = $db->prepare('DELETE FROM email_otps WHERE id = ?');
-    $stmt->execute([$otp['id']]);
-
-    // Find or create user
-    $stmt = $db->prepare('SELECT id, email, name FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-
-    $status = 'AUTHENTICATED';
-
-    if (!$user) {
-        // Create new user
-        $stmt = $db->prepare(
-            'INSERT INTO users (email, auth_provider) VALUES (?, ?)'
-        );
-        $stmt->execute([$email, 'email']);
-        $userId = $db->lastInsertId();
-        $userName = '';
-        $status = 'NEW_USER';
-    } else {
-        $userId   = $user['id'];
-        $userName = $user['name'] ?: '';
-    }
-
-    // Create session
-    $session = createSession($userId, $email);
-
-    // Count user's calendars
-    $stmt = $db->prepare('SELECT COUNT(*) AS cnt FROM salah_calendars WHERE user_id = ?');
-    $stmt->execute([$userId]);
-    $calendarCount = (int)$stmt->fetch()['cnt'];
-
-    jsonOK([
-        'status'  => $status,
-        'session' => $session,
-        'user'    => [
-            'email' => $email,
-            'name'  => $userName,
-        ],
-        'calendar_count' => $calendarCount,
-    ]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ACTION: send-magic-link
-   Sends a magic-link email for one-click sign-in
-══════════════════════════════════════════════════════════════ */
-function actionSendMagicLink() {
-    $email = requirePost('email');
-
-    // Validate email format
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        jsonErr('Please provide a valid email address.');
-    }
-
-    $db = getDB();
-
-    // Generate token
-    $token  = generateToken();
-    $expiry = date('Y-m-d H:i:s', time() + 86400); // 24 hours
-
-    $stmt = $db->prepare(
-        'INSERT INTO magic_links (email, token, expiry) VALUES (?, ?, ?)'
-    );
-    $stmt->execute([$email, $token, $expiry]);
-
-    // Build magic link URL
-    $link = APP_BASE_URL . '/SalahCalendar/?token=' . $token;
-
-    // Look up user name for email personalisation
-    $stmt = $db->prepare('SELECT name FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-    $name = $user ? ($user['name'] ?: '') : '';
-
-    // Send email
-    $emailService = new BrevoEmailService(BREVO_API_KEY);
-    $htmlBody = buildMagicLinkEmailHTML($link, $name);
-    $emailService->sendEmail($email, 'Sign In to Salah Calendar', $htmlBody, $name);
-
-    jsonOK([
-        'masked_email' => maskEmail($email),
-    ]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ACTION: verify-magic-link
-   Verifies magic-link token and creates session
-══════════════════════════════════════════════════════════════ */
-function actionVerifyMagicLink() {
-    $token = isset($_GET['token']) ? trim($_GET['token']) : '';
-    if ($token === '') jsonErr('Missing magic link token.');
-
-    $db = getDB();
-
-    // Look up token
-    $stmt = $db->prepare(
-        'SELECT id, email FROM magic_links
-         WHERE token = ? AND expiry > NOW() AND used = 0
-         LIMIT 1'
-    );
-    $stmt->execute([$token]);
-    $link = $stmt->fetch();
-
-    if (!$link) {
-        jsonErr('Invalid or expired magic link.', 401);
-    }
-
-    // Mark as used
-    $stmt = $db->prepare('UPDATE magic_links SET used = 1 WHERE id = ?');
-    $stmt->execute([$link['id']]);
-
-    $email = $link['email'];
-
-    // Find or create user
-    $stmt = $db->prepare('SELECT id, email, name FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    $user = $stmt->fetch();
-
-    if (!$user) {
-        $stmt = $db->prepare(
-            'INSERT INTO users (email, auth_provider) VALUES (?, ?)'
-        );
-        $stmt->execute([$email, 'email']);
-        $userId   = $db->lastInsertId();
-        $userName = '';
-    } else {
-        $userId   = $user['id'];
-        $userName = $user['name'] ?: '';
-    }
-
-    // Create session
-    $session = createSession($userId, $email);
-
-    // Count user's calendars
-    $stmt = $db->prepare('SELECT COUNT(*) AS cnt FROM salah_calendars WHERE user_id = ?');
-    $stmt->execute([$userId]);
-    $calendarCount = (int)$stmt->fetch()['cnt'];
-
-    jsonOK([
-        'session' => $session,
-        'user'    => [
-            'email' => $email,
-            'name'  => $userName,
-        ],
-        'calendar_count' => $calendarCount,
-    ]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ACTION: check-session
-   Validates a session token and returns user info
-══════════════════════════════════════════════════════════════ */
-function actionCheckSession() {
     $session = validateSession();
-
-    if (!$session) {
-        jsonErr('Session expired or invalid.', 401);
-    }
-
-    $db = getDB();
-
-    // Count user's calendars
-    $stmt = $db->prepare('SELECT COUNT(*) AS cnt FROM salah_calendars WHERE user_id = ?');
-    $stmt->execute([$session['user_id']]);
-    $calendarCount = (int)$stmt->fetch()['cnt'];
-
-    jsonOK([
-        'user' => [
-            'email' => $session['email'],
-            'name'  => $session['name'],
-        ],
-        'calendar_count' => $calendarCount,
-    ]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ACTION: logout
-   Destroys a session token
-══════════════════════════════════════════════════════════════ */
-function actionLogout() {
-    $token = requirePost('session_token');
-
-    $db = getDB();
-    $stmt = $db->prepare('DELETE FROM user_sessions WHERE session_token = ?');
-    $stmt->execute([$token]);
-
-    jsonOK([]);
-}
-
-/* ══════════════════════════════════════════════════════════════
-   ACTION: get-user-calendars
-   Lists all calendars for the authenticated user
-══════════════════════════════════════════════════════════════ */
-function actionGetUserCalendars() {
-    $session = validateSession();
-
     if (!$session) {
         jsonErr('Unauthorized: valid session required.', 401);
     }
 
     $db = getDB();
 
+    // Verify ownership
     $stmt = $db->prepare(
-        'SELECT calendar_key, params, created_at, modified_at
-         FROM salah_calendars
-         WHERE user_id = ?
-         ORDER BY created_at DESC'
+        'SELECT id, user_id FROM salah_calendars WHERE calendar_key = ?'
     );
-    $stmt->execute([$session['user_id']]);
-    $rows = $stmt->fetchAll();
+    $stmt->execute([$calendarKey]);
+    $row = $stmt->fetch();
 
-    $calendars = [];
-    foreach ($rows as $row) {
-        $params = json_decode($row['params'], true);
-        $summary = [];
-        if (!empty($params['location'])) {
-            $summary['location'] = $params['location'];
-        }
-        $calendars[] = [
-            'calendar_key'  => $row['calendar_key'],
-            'created_at'    => $row['created_at'],
-            'modified_at'   => $row['modified_at'],
-            'params_summary' => $summary,
-        ];
+    if (!$row) {
+        jsonErr('Calendar not found.', 404);
+    }
+    if ((int)$row['user_id'] !== (int)$session['user_id']) {
+        jsonErr('Unauthorized: you do not own this calendar.', 403);
     }
 
-    jsonOK(['calendars' => $calendars]);
-}
+    // Delete calendar
+    $stmt = $db->prepare('DELETE FROM salah_calendars WHERE calendar_key = ? AND user_id = ?');
+    $stmt->execute([$calendarKey, $session['user_id']]);
 
-/* ══════════════════════════════════════════════════════════════
-   ACTION: check-calendar-key
-   Checks if a calendar key already exists
-══════════════════════════════════════════════════════════════ */
-function actionCheckCalendarKey() {
-    $key = isset($_GET['key']) ? trim($_GET['key']) : '';
-    if ($key === '') jsonErr('Missing calendar key.');
-
-    $db = getDB();
-
-    $stmt = $db->prepare('SELECT id FROM salah_calendars WHERE calendar_key = ?');
-    $stmt->execute([$key]);
-
-    jsonOK(['exists' => (bool)$stmt->fetch()]);
+    jsonOK(['success' => true]);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -818,87 +521,19 @@ function buildCalendarEmailHTML($httpsLink, $webcalLink, $location, $calendarKey
 HTML;
 }
 
-function buildOTPEmailHTML($code, $name) {
-    $greeting = $name ? "Assalamu Alaikum {$name}," : "Assalamu Alaikum,";
-    $year = date('Y');
-    return <<<HTML
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f7f5;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f5;padding:40px 20px;">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);overflow:hidden;">
-  <tr><td style="background:linear-gradient(135deg,#1B7A56,#228E64);padding:32px 40px;text-align:center;">
-    <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:600;">🔐 Verification Code</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Salah Calendar Login</p>
-  </td></tr>
-  <tr><td style="padding:32px 40px;text-align:center;">
-    <p style="margin:0 0 24px;color:#1a2b22;font-size:15px;line-height:1.6;text-align:left;">{$greeting}</p>
-    <p style="margin:0 0 8px;color:#6a7f72;font-size:13px;text-align:left;">Your one-time verification code is:</p>
-    <div style="background:#eaf0e6;border-radius:12px;padding:20px;margin:16px 0 24px;display:inline-block;">
-      <span style="font-family:monospace;font-size:36px;font-weight:700;color:#1B7A56;letter-spacing:8px;">{$code}</span>
-    </div>
-    <p style="margin:0 0 8px;color:#6a7f72;font-size:13px;line-height:1.6;text-align:left;">
-      This code expires in <strong>100 seconds</strong>. If you didn't request this code, please ignore this email.
-    </p>
-    <div style="background:#fff5f5;border:1px solid #fce0e0;border-radius:8px;padding:12px;margin-top:16px;text-align:left;">
-      <p style="margin:0;color:#c94a3a;font-size:12px;">⚠️ Never share this code with anyone. Salah Calendar will never ask for it outside the app.</p>
-    </div>
-  </td></tr>
-  <tr><td style="background:#f4f7f5;padding:20px 40px;text-align:center;border-top:1px solid #e2e8e4;">
-    <p style="margin:0;color:#6a7f72;font-size:12px;">© {$year} Salah Calendar by Hablullah</p>
-  </td></tr>
-</table>
-</td></tr>
-</table>
-</body>
-</html>
-HTML;
-}
 
-function buildMagicLinkEmailHTML($link, $name) {
-    $greeting = $name ? "Assalamu Alaikum {$name}," : "Assalamu Alaikum,";
-    $year = date('Y');
-    return <<<HTML
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f4f7f5;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f5;padding:40px 20px;">
-<tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);overflow:hidden;">
-  <tr><td style="background:linear-gradient(135deg,#1B7A56,#228E64);padding:32px 40px;text-align:center;">
-    <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:600;">🔗 Sign In to Salah Calendar</h1>
-    <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">One-Click Sign In</p>
-  </td></tr>
-  <tr><td style="padding:32px 40px;">
-    <p style="margin:0 0 24px;color:#1a2b22;font-size:15px;line-height:1.6;">{$greeting}</p>
-    <p style="margin:0 0 24px;color:#6a7f72;font-size:14px;line-height:1.6;">
-      Click the button below to sign in to your Salah Calendar account. This link expires in 24 hours and can only be used once.
-    </p>
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-      <tr><td align="center" style="padding:8px 0;">
-        <a href="{$link}" style="display:inline-block;background:#1B7A56;color:#ffffff;font-size:16px;font-weight:600;padding:14px 36px;border-radius:8px;text-decoration:none;">🔗 Sign In Now</a>
-      </td></tr>
-    </table>
-    <p style="margin:0 0 16px;color:#6a7f72;font-size:13px;line-height:1.6;">
-      Or copy and paste this link into your browser:
-    </p>
-    <p style="margin:0 0 24px;background:#f8f9fa;border:1px solid #e2e8e4;border-radius:8px;padding:12px 16px;font-family:monospace;font-size:13px;color:#C08B18;word-break:break-all;">{$link}</p>
-    <div style="background:#fff5f5;border:1px solid #fce0e0;border-radius:8px;padding:12px;margin-top:16px;">
-      <p style="margin:0;color:#c94a3a;font-size:12px;">⚠️ If you didn't request this, please ignore this email.</p>
-    </div>
-  </td></tr>
-  <tr><td style="background:#f4f7f5;padding:20px 40px;text-align:center;border-top:1px solid #e2e8e4;">
-    <p style="margin:0;color:#6a7f72;font-size:12px;">© {$year} Salah Calendar by Hablullah · <a href="https://prayer.hablullah.app" style="color:#1B7A56;text-decoration:none;">prayer.hablullah.app</a></p>
-  </td></tr>
-</table>
-</td></tr>
-</table>
-</body>
-</html>
-HTML;
+
+/* ══════════════════════════════════════════════════════════════
+   ACTION: check-email
+   Checks if an email exists in the users table
+══════════════════════════════════════════════════════════════ */
+function actionCheckEmail() {
+    $email = strtolower(requirePost('email'));
+    $db = getDB();
+    $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
+    $stmt->execute([$email]);
+    $exists = (bool)$stmt->fetch();
+    jsonOK(['exists' => $exists]);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -920,6 +555,12 @@ switch ($action) {
     case 'logout':            actionLogout();           break;
     case 'get-user-calendars':actionGetUserCalendars(); break;
     case 'check-calendar-key':actionCheckCalendarKey(); break;
+    case 'login-password':    actionLoginPassword();    break;
+    case 'signup-password':   actionSignupPassword();   break;
+    case 'forgot-password':   actionForgotPassword();   break;
+    case 'reset-password':    actionResetPassword();    break;
+    case 'delete-calendar':   actionDeleteCalendar();   break;
+    case 'check-email':       actionCheckEmail();       break;
     default:
-        jsonErr('Invalid action. Supported: register, send-otp, verify-otp, get-calendar, update-calendar, send-login-otp, verify-login-otp, send-magic-link, verify-magic-link, check-session, logout, get-user-calendars, check-calendar-key');
+        jsonErr('Invalid action. Supported: register, send-otp, verify-otp, get-calendar, update-calendar, send-login-otp, verify-login-otp, send-magic-link, verify-magic-link, check-session, logout, get-user-calendars, check-calendar-key, login-password, signup-password, forgot-password, reset-password, delete-calendar');
 }

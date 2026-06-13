@@ -112,6 +112,9 @@ body {
 .brand { display:flex; align-items:center; gap:.6rem; }
 .brand-icon { height:30px; width:30px; border-radius:7px; box-shadow: 0 0 8px rgba(0,0,0,.15); }
 .brand-name { font-size:.95rem; color:var(--hdr-text); font-weight:600; letter-spacing:.04em; }
+.app-version { display:flex; flex-direction:column; margin-left:.4rem; justify-content:center; border-left: 1px solid rgba(255,255,255,.2); padding-left:.5rem; }
+.app-version .v-num { font-size:.65rem; font-weight:700; color:var(--primary-lt); line-height:1; }
+.app-version .v-date { font-size:.55rem; color:rgba(255,255,255,.7); line-height:1; margin-top:3px; white-space:nowrap; text-transform:uppercase; letter-spacing:.02em; }
 .hdr-sep  { flex:1; }
 .hdr-tag  { font-size:.7rem; color:rgba(255,255,255,.7); letter-spacing:.1em; text-transform:uppercase;
             border:1px solid rgba(255,255,255,.2); padding:.28rem .75rem; border-radius:100px; }
@@ -686,6 +689,10 @@ select.inp {
   <div class="brand">
     <img src="assets/icon.png" alt="SalahCalendar" class="brand-icon">
     <span class="brand-name">SalahCalendar</span>
+    <div class="app-version">
+      <span class="v-num">v2.1.0</span>
+      <span class="v-date">Compiled: 13 Jun 2026</span>
+    </div>
   </div>
   <div class="hdr-sep"></div>
   <img src="assets/hablullah2.png" alt="Hablullah" class="hdr-tag" style="height: 30px; border: none; padding: 0; border-radius: 0;">
@@ -935,34 +942,18 @@ select.inp {
                   <div id="dyn-cal-options"></div>
                 </div>
 
-                <div class="field">
+                <div class="field" id="dyn-calkey-wrap" style="display:none;">
                   <label class="lbl" for="dyn-calkey">Calendar ID</label>
                   <input id="dyn-calkey" class="inp" type="text" autocomplete="off">
                   <div class="key-status" id="dyn-key-status"></div>
                   <span class="hint">Unique identifier for your calendar</span>
                 </div>
 
-                <div class="field-row">
-                  <div class="field">
-                    <label class="lbl" for="dyn-name">Name <span style="color:var(--muted);font-weight:400;text-transform:none;">(optional)</span></label>
-                    <input id="dyn-name" class="inp" type="text" placeholder="Your name" autocomplete="name">
-                  </div>
-                  <div class="field">
-                    <label class="lbl" for="dyn-phone">Phone <span style="color:var(--muted);font-weight:400;text-transform:none;">(optional)</span></label>
-                    <input id="dyn-phone" class="inp" type="tel" placeholder="+44 ..." autocomplete="tel">
-                  </div>
+                <div id="dyn-email-next-wrap" style="margin-top:1rem;">
+                  <button type="button" class="btn btn-prim" style="width:100%" id="dyn-email-next-btn" onclick="checkEmailAndProceed()">Next</button>
                 </div>
-                <div class="field-row">
-                  <div class="field">
-                    <label class="lbl" for="dyn-city">City</label>
-                    <input id="dyn-city" class="inp" type="text" readonly>
-                  </div>
-                  <div class="field">
-                    <label class="lbl" for="dyn-country">Country</label>
-                    <input id="dyn-country" class="inp" type="text" readonly>
-                  </div>
-                </div>
-                <button type="submit" class="dyn-submit" id="dyn-submit-btn">
+
+                <button type="submit" class="dyn-submit" id="dyn-submit-btn" style="display:none;">
                   <span class="btn-text">📨 Generate &amp; Send Link</span>
                   <span class="spinner"></span>
                 </button>
@@ -1054,17 +1045,31 @@ select.inp {
         <h3>🔐 Sign In to Salah Calendar</h3>
         <p class="auth-desc">Access your saved calendars and manage your prayer time subscriptions.</p>
 
-        <div class="auth-method-toggle">
+        <div class="auth-method-toggle" id="auth-method-toggle-container">
           <button id="auth-method-otp" class="active" onclick="switchAuthMethod('otp')">🔑 OTP Code</button>
           <button id="auth-method-link" onclick="switchAuthMethod('link')">🔗 Email Link</button>
+          <button id="auth-method-pwd" onclick="switchAuthMethod('pwd')">🔑 Password</button>
         </div>
 
         <p class="auth-error" id="auth-error"></p>
+        <div class="auth-success" id="auth-success" style="display:none; margin-bottom:1rem; margin-top:0;"></div>
 
         <!-- Email input (shared) -->
         <div class="field" id="auth-email-field">
           <label class="lbl" for="auth-email">Email Address</label>
           <input id="auth-email" class="inp" type="email" placeholder="your@email.com" autocomplete="email">
+        </div>
+
+        <!-- Password section -->
+        <div id="auth-password-section" style="display:none; margin-bottom: 0.85rem;">
+          <div class="field" id="auth-pwd-field">
+            <label class="lbl" id="auth-pwd-label" for="auth-pwd">Password</label>
+            <input id="auth-pwd" class="inp" type="password" placeholder="••••••••">
+          </div>
+          <div style="font-size:0.82rem; margin-top:0.5rem; display:flex; justify-content:space-between;" id="auth-pwd-links">
+            <a href="#" onclick="togglePwdMode(); return false;" id="auth-pwd-toggle-link" style="color:var(--primary); text-decoration:none;">Create Account</a>
+            <a href="#" onclick="forgotPwdMode(); return false;" id="auth-pwd-forgot-link" style="color:var(--muted); text-decoration:none;">Forgot Password?</a>
+          </div>
         </div>
 
         <!-- OTP section -->
@@ -1158,6 +1163,14 @@ function clearSession() {
 }
 
 async function checkSessionOnLoad() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const resetToken = urlParams.get('reset_token');
+  if (resetToken) {
+    showAuthModal('pwd');
+    authPwdMode = 'reset';
+    updatePwdUI();
+  }
+
   const token = getSessionToken();
   if (!token) {
     updateAccountUI();
@@ -1173,6 +1186,15 @@ async function checkSessionOnLoad() {
       authenticatedEmail = data.user.email;
       const sessionData = getSessionData();
       setSessionToken(sessionData.token, sessionData.expires_at, data.user.email, data.user.name, data.calendar_count);
+      
+      if (activeTab === 'feed') {
+        const dynEmailEl = document.getElementById('dyn-email');
+        if (dynEmailEl) {
+          dynEmailEl.value = data.user.email;
+          dynEmailEl.readOnly = true;
+          loadUserCalendarsForDynForm();
+        }
+      }
     } else {
       clearSession();
     }
@@ -1273,6 +1295,9 @@ async function signOut() {
   document.getElementById('dyn-email').value = '';
   document.getElementById('dyn-email').readOnly = false;
   document.getElementById('dyn-cal-select').style.display = 'none';
+  document.getElementById('dyn-email-next-wrap').style.display = 'block';
+  document.getElementById('dyn-calkey-wrap').style.display = 'none';
+  document.getElementById('dyn-submit-btn').style.display = 'none';
   document.getElementById('dyn-submit-btn').querySelector('.btn-text').textContent = '📨 Generate & Send Link';
   document.getElementById('dyn-success').style.display = 'none';
   document.getElementById('dyn-success').innerHTML = '';
@@ -1281,19 +1306,22 @@ async function signOut() {
 /* ================================================================
    Auth Modal — Sign In via OTP or Magic Link
 ================================================================ */
-let authMode = 'otp'; // 'otp' or 'link'
+let authMode = 'otp'; // 'otp', 'link', 'pwd'
+let authPwdMode = 'login'; // 'login', 'signup', 'forgot', 'reset'
 let authOTPCountdownInterval = null;
 let authOTPResendCooldown = null;
 let authEmail = '';
 
 function showAuthModal(mode) {
   closeAccountMenu();
-  authMode = mode || 'otp';
+  authMode = mode || 'pwd';
   switchAuthMethod(authMode);
   document.getElementById('auth-overlay').style.display = 'flex';
   document.getElementById('auth-email').value = '';
+  if(document.getElementById('auth-pwd')) document.getElementById('auth-pwd').value = '';
   document.getElementById('auth-email').focus();
   document.getElementById('auth-error').style.display = 'none';
+  if(document.getElementById('auth-success')) document.getElementById('auth-success').style.display = 'none';
   document.getElementById('auth-otp-section').style.display = 'none';
   document.getElementById('auth-email-field').style.display = 'block';
   document.getElementById('auth-send-btn').style.display = 'flex';
@@ -1310,24 +1338,101 @@ function switchAuthMethod(mode) {
   authMode = mode;
   document.getElementById('auth-method-otp').classList.toggle('active', mode === 'otp');
   document.getElementById('auth-method-link').classList.toggle('active', mode === 'link');
-  document.getElementById('auth-send-text').textContent = mode === 'otp' ? 'Send OTP Code' : 'Send Sign-In Link';
+  const pwdBtn = document.getElementById('auth-method-pwd');
+  if (pwdBtn) pwdBtn.classList.toggle('active', mode === 'pwd');
+  
+  if (mode === 'pwd') {
+    if (authPwdMode !== 'reset') authPwdMode = 'login';
+    updatePwdUI();
+  } else {
+    document.getElementById('auth-send-text').textContent = mode === 'otp' ? 'Send OTP Code' : 'Send Sign-In Link';
+  }
+  
   // Reset state
   document.getElementById('auth-otp-section').style.display = 'none';
-  document.getElementById('auth-email-field').style.display = 'block';
+  const pwdSect = document.getElementById('auth-password-section');
+  if (pwdSect) pwdSect.style.display = (mode === 'pwd' && authPwdMode !== 'forgot') ? 'block' : 'none';
+  document.getElementById('auth-email-field').style.display = (mode === 'pwd' && authPwdMode === 'reset') ? 'none' : 'block';
   document.getElementById('auth-send-btn').style.display = 'flex';
   document.getElementById('auth-link-success').style.display = 'none';
   document.getElementById('auth-error').style.display = 'none';
+  if(document.getElementById('auth-success')) document.getElementById('auth-success').style.display = 'none';
+}
+
+function togglePwdMode() {
+  if (authPwdMode === 'reset') {
+    authPwdMode = 'login';
+    document.getElementById('auth-email-field').style.display = 'block';
+  } else {
+    authPwdMode = authPwdMode === 'login' ? 'signup' : 'login';
+  }
+  updatePwdUI();
+}
+
+function forgotPwdMode() {
+  authPwdMode = 'forgot';
+  updatePwdUI();
+}
+
+function updatePwdUI() {
+  const lbl = document.getElementById('auth-pwd-label');
+  const link = document.getElementById('auth-pwd-toggle-link');
+  const forgot = document.getElementById('auth-pwd-forgot-link');
+  const pwdSect = document.getElementById('auth-password-section');
+  const btnText = document.getElementById('auth-send-text');
+  const emailField = document.getElementById('auth-email-field');
+  const authToggleContainer = document.getElementById('auth-method-toggle-container');
+  
+  if(document.getElementById('auth-success')) document.getElementById('auth-success').style.display = 'none';
+  document.getElementById('auth-error').style.display = 'none';
+  
+  if (authPwdMode === 'reset') {
+    authToggleContainer.style.display = 'none';
+  } else {
+    authToggleContainer.style.display = 'flex';
+  }
+  
+  if (authPwdMode === 'login') {
+    pwdSect.style.display = 'block';
+    emailField.style.display = 'block';
+    lbl.textContent = 'Password';
+    link.textContent = 'Create Account';
+    forgot.style.display = 'inline';
+    btnText.textContent = 'Sign In';
+  } else if (authPwdMode === 'signup') {
+    pwdSect.style.display = 'block';
+    emailField.style.display = 'block';
+    lbl.textContent = 'Create Password';
+    link.textContent = 'Already have an account? Sign In';
+    forgot.style.display = 'none';
+    btnText.textContent = 'Create Account';
+  } else if (authPwdMode === 'forgot') {
+    pwdSect.style.display = 'none';
+    emailField.style.display = 'block';
+    btnText.textContent = 'Send Reset Link';
+    // When in forgot mode, we might want a back button, but clicking the tabs also works
+  } else if (authPwdMode === 'reset') {
+    pwdSect.style.display = 'block';
+    emailField.style.display = 'none';
+    lbl.textContent = 'New Password';
+    link.textContent = 'Back to Sign In';
+    forgot.style.display = 'none';
+    btnText.textContent = 'Reset Password';
+  }
 }
 
 async function sendAuthAction() {
   const email = document.getElementById('auth-email').value.trim();
+  const pwd = document.getElementById('auth-pwd') ? document.getElementById('auth-pwd').value : '';
   const errEl = document.getElementById('auth-error');
   const btn = document.getElementById('auth-send-btn');
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errEl.textContent = 'Please enter a valid email address.';
-    errEl.style.display = 'block';
-    return;
+  if (authMode !== 'pwd' || authPwdMode !== 'reset') {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errEl.textContent = 'Please enter a valid email address.';
+      errEl.style.display = 'block';
+      return;
+    }
   }
 
   errEl.style.display = 'none';
@@ -1338,7 +1443,65 @@ async function sendAuthAction() {
   try {
     const fd = new FormData();
 
-    if (authMode === 'otp') {
+    if (authMode === 'pwd') {
+      if (authPwdMode === 'login') {
+        if (!pwd) { errEl.textContent = 'Please enter your password.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+        fd.append('action', 'login-password');
+        fd.append('email', email);
+        fd.append('password', pwd);
+        const res = await fetch(API_BASE, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) { errEl.textContent = data.message || 'Login failed.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+        setSessionToken(data.token, data.expires_at, data.user.email, data.user.name, data.calendar_count);
+        isAuthenticated = true;
+        authenticatedEmail = data.user.email;
+        closeAuthModal();
+        if (activeTab === 'feed') {
+          const dynEmailEl = document.getElementById('dyn-email');
+          if (dynEmailEl) { dynEmailEl.value = data.user.email; dynEmailEl.readOnly = true; loadUserCalendarsForDynForm(); }
+        }
+      } else if (authPwdMode === 'signup') {
+        if (!pwd || pwd.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+        fd.append('action', 'signup-password');
+        fd.append('email', email);
+        fd.append('password', pwd);
+        const res = await fetch(API_BASE, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) { errEl.textContent = data.message || 'Signup failed.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+        setSessionToken(data.token, data.expires_at, data.user.email, data.user.name, data.calendar_count);
+        isAuthenticated = true;
+        authenticatedEmail = data.user.email;
+        closeAuthModal();
+        if (activeTab === 'feed') {
+          const dynEmailEl = document.getElementById('dyn-email');
+          if (dynEmailEl) { dynEmailEl.value = data.user.email; dynEmailEl.readOnly = true; loadUserCalendarsForDynForm(); }
+        }
+      } else if (authPwdMode === 'forgot') {
+        fd.append('action', 'forgot-password');
+        fd.append('email', email);
+        const res = await fetch(API_BASE, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) { errEl.textContent = data.message || 'Request failed.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+        document.getElementById('auth-success').textContent = '✅ Reset link sent! Check your inbox.';
+        document.getElementById('auth-success').style.display = 'block';
+      } else if (authPwdMode === 'reset') {
+        if (!pwd || pwd.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('reset_token');
+        fd.append('action', 'reset-password');
+        fd.append('token', token);
+        fd.append('new_password', pwd);
+        const res = await fetch(API_BASE, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.success) { errEl.textContent = data.message || 'Reset failed. Token might be expired.'; errEl.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+        document.getElementById('auth-success').textContent = '✅ Password reset successfully. Please sign in.';
+        document.getElementById('auth-success').style.display = 'block';
+        document.getElementById('auth-pwd').value = '';
+        authPwdMode = 'login';
+        updatePwdUI();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } else if (authMode === 'otp') {
       fd.append('action', 'send-login-otp');
       fd.append('email', email);
 
@@ -1504,6 +1667,50 @@ let dynSelectedMode = 'new'; // 'new' or 'overwrite'
 let dynSelectedOverwriteKey = '';
 let dynUserCalendars = [];
 
+async function checkEmailAndProceed() {
+  const email = document.getElementById('dyn-email').value.trim();
+  const errEl = document.getElementById('dyn-error');
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    document.getElementById('dyn-email').classList.add('error');
+    errEl.textContent = 'Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+  document.getElementById('dyn-email').classList.remove('error');
+  errEl.style.display = 'none';
+
+  const btn = document.getElementById('dyn-email-next-btn');
+  btn.textContent = 'Checking...';
+  btn.disabled = true;
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'check-email');
+    fd.append('email', email);
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+    
+    showAuthModal('pwd');
+    document.getElementById('auth-email').value = email;
+    
+    if (data.exists) {
+      authPwdMode = 'login';
+    } else {
+      authPwdMode = 'signup';
+    }
+    updatePwdUI();
+    
+  } catch(e) {
+    errEl.textContent = 'Network error. Please check your connection.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.textContent = 'Next';
+    btn.disabled = false;
+  }
+}
+
 function updateDynSubmitState() {
   const btn = document.getElementById('dyn-submit-btn');
   const email = document.getElementById('dyn-email').value.trim();
@@ -1540,6 +1747,11 @@ async function loadUserCalendarsForDynForm() {
 function showCalendarSelection(calendars) {
   const selectWrap = document.getElementById('dyn-cal-select');
   const optionsDiv = document.getElementById('dyn-cal-options');
+  
+  // Update form visibility for authenticated user
+  document.getElementById('dyn-email-next-wrap').style.display = 'none';
+  document.getElementById('dyn-calkey-wrap').style.display = 'block';
+  document.getElementById('dyn-submit-btn').style.display = 'flex';
 
   if (!calendars || calendars.length === 0) {
     // New user — only create new
@@ -1556,28 +1768,78 @@ function showCalendarSelection(calendars) {
   selectWrap.style.display = 'block';
   let html = '';
 
+  const limitReached = calendars.length >= 5;
+  
+  let viewingOthers = false;
+  if (currentCalendarKey) {
+    const ownsCurrent = calendars.some(c => c.calendar_key === currentCalendarKey);
+    if (!ownsCurrent) {
+      viewingOthers = true;
+      dynSelectedMode = 'new'; // Default to create new
+    }
+  }
+
+  if (limitReached && dynSelectedMode === 'new' && !viewingOthers) {
+    dynSelectedMode = 'overwrite';
+    dynSelectedOverwriteKey = calendars[0].calendar_key;
+  }
+
+  if (viewingOthers) {
+    html += `<div style="background:var(--bg-amber); padding:0.75rem; border-radius:6px; margin-bottom:1rem; font-size:0.88rem; color:#854d0e;">
+      <strong>Note:</strong> You are viewing someone else's calendar. You can save these settings as a new calendar in your account.
+    </div>`;
+  }
+
   // Create new option
-  html += `<label class="cal-option ${dynSelectedMode === 'new' ? 'selected' : ''}" onclick="selectCalendarMode('new', '')">
-    <input type="radio" name="cal-mode" value="new" ${dynSelectedMode === 'new' ? 'checked' : ''}>
-    <div>
+  html += `<label class="cal-option ${dynSelectedMode === 'new' ? 'selected' : ''}" ${limitReached ? 'style="opacity:0.6; cursor:not-allowed;"' : `onclick="selectCalendarMode('new', '')"`}>
+    <input type="radio" name="cal-mode" value="new" ${dynSelectedMode === 'new' ? 'checked' : ''} ${limitReached ? 'disabled' : ''}>
+    <div style="flex:1;">
       <div class="cal-option-label">Create New Calendar</div>
-      <div class="cal-option-meta">Generate a new calendar with a unique ID</div>
+      <div class="cal-option-meta">Generate a new calendar with a unique ID ${limitReached ? '<strong style="color:var(--danger)">(Limit reached: 5/5)</strong>' : ''}</div>
     </div>
   </label>`;
 
   // Overwrite existing options
   calendars.forEach(cal => {
     const loc = cal.params_summary || cal.calendar_key;
-    html += `<label class="cal-option ${dynSelectedMode === 'overwrite' && dynSelectedOverwriteKey === cal.calendar_key ? 'selected' : ''}" onclick="selectCalendarMode('overwrite', '${esc(cal.calendar_key)}')">
-      <input type="radio" name="cal-mode" value="overwrite-${esc(cal.calendar_key)}" ${dynSelectedMode === 'overwrite' && dynSelectedOverwriteKey === cal.calendar_key ? 'checked' : ''}>
-      <div>
+    const isSelected = dynSelectedMode === 'overwrite' && dynSelectedOverwriteKey === cal.calendar_key;
+    html += `<label class="cal-option ${isSelected ? 'selected' : ''}" onclick="selectCalendarMode('overwrite', '${esc(cal.calendar_key)}')">
+      <input type="radio" name="cal-mode" value="overwrite-${esc(cal.calendar_key)}" ${isSelected ? 'checked' : ''}>
+      <div style="flex:1;">
         <div class="cal-option-label">Overwrite: ${esc(cal.calendar_key)}</div>
-        <div class="cal-option-meta">${esc(loc)} · Modified ${cal.modified_at || cal.created_at || 'N/A'}</div>
+        <div class="cal-option-meta" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>${esc(loc)} · Modified ${cal.modified_at || cal.created_at || 'N/A'}</span>
+          <button type="button" title="Delete Calendar" onclick="event.stopPropagation(); deleteCalendar('${esc(cal.calendar_key)}')" style="background:none; border:none; cursor:pointer; font-size:1rem; padding:0 0.5rem; opacity:0.7;">🗑️</button>
+        </div>
       </div>
     </label>`;
   });
 
   optionsDiv.innerHTML = html;
+}
+
+async function deleteCalendar(calendarKey) {
+  if (!confirm("Are you sure you want to delete this calendar? This action cannot be undone.")) return;
+  
+  const token = getSessionToken();
+  if (!token) return;
+
+  try {
+    const fd = new FormData();
+    fd.append('action', 'delete-calendar');
+    fd.append('session_token', token);
+    fd.append('calendar_key', calendarKey);
+
+    const res = await fetch(API_BASE, { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.success) {
+      loadUserCalendarsForDynForm(); // reload
+    } else {
+      alert(data.message || 'Failed to delete calendar.');
+    }
+  } catch(e) {
+    alert('Network error. Please try again.');
+  }
 }
 
 function selectCalendarMode(mode, key) {
@@ -2203,8 +2465,7 @@ function switchFeedMode(mode) {
 }
 
 function updateDynFormLocation() {
-  document.getElementById('dyn-city').value = S.city || S.name || '';
-  document.getElementById('dyn-country').value = S.country || '';
+  // Fields removed
 }
 
 /* ================================================================
@@ -2214,10 +2475,6 @@ async function submitDynamicCalendar(e) {
   e.preventDefault();
   const email = document.getElementById('dyn-email').value.trim();
   const calKey = document.getElementById('dyn-calkey').value.trim();
-  const name = document.getElementById('dyn-name').value.trim();
-  const phone = document.getElementById('dyn-phone').value.trim();
-  const city = document.getElementById('dyn-city').value.trim();
-  const country = document.getElementById('dyn-country').value.trim();
   const errEl = document.getElementById('dyn-error');
   const btn = document.getElementById('dyn-submit-btn');
 
@@ -2247,10 +2504,10 @@ async function submitDynamicCalendar(e) {
     fd.append('action', 'register');
     fd.append('email', email);
     fd.append('calendar_key', calKey);
-    fd.append('name', name);
-    fd.append('phone', phone);
-    fd.append('city', city);
-    fd.append('country', country);
+    fd.append('name', '');
+    fd.append('phone', '');
+    fd.append('city', S.city || S.name || '');
+    fd.append('country', S.country || '');
     fd.append('params', JSON.stringify(params));
 
     // Include session token if authenticated
@@ -2562,6 +2819,10 @@ function resetToNewCalendar() {
   document.getElementById('dyn-form-wrap').style.display = 'block';
   document.getElementById('dyn-email').value = '';
   document.getElementById('dyn-email').readOnly = false;
+  document.getElementById('dyn-cal-select').style.display = 'none';
+  document.getElementById('dyn-email-next-wrap').style.display = 'block';
+  document.getElementById('dyn-calkey-wrap').style.display = 'none';
+  document.getElementById('dyn-submit-btn').style.display = 'none';
   document.getElementById('dyn-submit-btn').querySelector('.btn-text').textContent = '📨 Generate & Send Link';
   document.getElementById('dyn-success').style.display = 'none';
   document.getElementById('dyn-success').innerHTML = '';

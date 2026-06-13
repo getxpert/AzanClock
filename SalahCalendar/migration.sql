@@ -83,3 +83,21 @@ CREATE TABLE IF NOT EXISTS magic_links (
   INDEX idx_token (token),
   INDEX idx_expiry (expiry)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- ── Modify Table: users ────────────────────────────────────
+-- Add password_hash column for password authentication
+ALTER TABLE users ADD COLUMN password_hash VARCHAR(255) NULL AFTER email;
+
+
+-- ── New Table: password_resets ─────────────────────────────
+-- Password reset tokens
+CREATE TABLE IF NOT EXISTS password_resets (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  token VARCHAR(128) UNIQUE NOT NULL,
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_token (token),
+  INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
