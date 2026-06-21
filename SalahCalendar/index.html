@@ -48,6 +48,7 @@
   --ar:          'Amiri', serif;
   --hdr:         54px;
   --sb:          360px;
+  --ftr:         32px;
   --hdr-bg:      linear-gradient(90deg,#1B7A56 0%,#228E64 100%);
   --hdr-text:    #FFFFFF;
   --hdr-border:  rgba(0,0,0,.10);
@@ -109,7 +110,8 @@ body {
   position: sticky; top: 0; z-index: 900;
   box-shadow: var(--shadow-md);
 }
-.brand { display:flex; align-items:center; gap:.6rem; }
+.brand { display:flex; align-items:center; gap:.6rem; cursor:pointer; transition: opacity 0.15s; }
+.brand:hover { opacity:0.85; }
 .brand-icon { height:30px; width:30px; border-radius:7px; box-shadow: 0 0 8px rgba(0,0,0,.15); }
 .brand-name { font-size:.95rem; color:var(--hdr-text); font-weight:600; letter-spacing:.04em; }
 .app-version { display:flex; flex-direction:column; margin-left:.4rem; justify-content:center; border-left: 1px solid rgba(255,255,255,.2); padding-left:.5rem; }
@@ -133,7 +135,7 @@ body {
 .app {
   display: grid;
   grid-template-columns: var(--sb) 1fr;
-  height: calc(100vh - var(--hdr));
+  height: calc(100vh - var(--hdr) - var(--ftr));
   overflow: hidden;
 }
 
@@ -314,7 +316,20 @@ select.inp {
 [data-theme="dark"] .map-tip { backdrop-filter:blur(6px); background:rgba(12,26,20,.85); }
 
 /* ── Preview panel ───────────────────────────────────────────────── */
-.prev-panel { padding-bottom: 2rem; }
+#tab-preview {
+  overflow: hidden;
+}
+#tab-preview.active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.prev-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+}
 .prev-topbar {
   display:flex; align-items:center; justify-content:space-between;
   padding:.8rem 1.25rem; background:var(--surf2);
@@ -337,7 +352,12 @@ select.inp {
 .tz-bar span { color:var(--primary); font-weight:500; }
 
 /* 7-day grid */
-.prev-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+.prev-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  flex: 1;
+  min-height: 0;
+}
 .empty-state { display:flex; align-items:center; justify-content:center;
               padding:4rem; color:var(--muted); font-size:1rem; text-align:center; }
 
@@ -345,9 +365,40 @@ select.inp {
 .p-day:last-child { border-right:none; }
 .p-day.today { background:var(--amber-dim); border-top:3px solid var(--amber); }
 
-.day-hdr { margin-bottom:1rem; }
+.day-hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+.day-hdr-left, .day-hdr-right {
+  display: flex;
+  flex-direction: column;
+}
+.day-hdr-right {
+  align-items: flex-end;
+  text-align: right;
+}
 .day-wd  { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
 .day-d   { font-size:1.25rem; font-weight:300; color:var(--text); line-height:1.2; margin-top:.2rem; }
+.day-ar-wd {
+  font-family: var(--ar);
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.day-ar-hijri {
+  display: inline-flex;
+  gap: 0.25rem;
+  direction: ltr;
+  font-family: var(--ar);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--primary);
+  line-height: 1.2;
+  margin-top: 0.2rem;
+}
 .today-tag { display:inline-block; font-size:.6rem; font-weight:700; text-transform:uppercase;
              background:var(--amber-dim); color:var(--amber); border-radius:4px;
              padding:.1rem .4rem; margin-top:.3rem; letter-spacing:.06em; }
@@ -416,7 +467,7 @@ select.inp {
 
 @media (max-width:768px) and (orientation:landscape) {
   :root { --sb:260px; --hdr:44px; }
-  .app { height:calc(100vh - var(--hdr)); }
+  .app { height:calc(100vh - var(--hdr) - var(--ftr)); }
   #map { height:calc(100vh - var(--hdr) - 45px); }
   .map-tip { display:none; }
   .prev-grid { grid-template-columns:repeat(7,minmax(72px,1fr)); overflow-x:auto; }
@@ -441,6 +492,9 @@ select.inp {
   .prev-grid { grid-template-columns:repeat(7,minmax(80px,1fr)); overflow-x:auto; }
   .hdr-tag { display:none; }
   .tabs-hdr { overflow-x: auto; white-space: nowrap; }
+  #tab-preview { height: auto; overflow: visible; }
+  .prev-panel { height: auto; }
+  .prev-table-wrap { height: auto; overflow-y: visible; }
 }
 
 @media (max-width:380px) {
@@ -680,18 +734,384 @@ select.inp {
 .key-status.invalid { color:var(--danger); }
 .key-status.checking { color:var(--muted); }
 
+/* ── Splash Screen Overlay ───────────────────────────────────────── */
+.splash-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(243, 246, 241, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 2rem;
+  box-sizing: border-box;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .splash-overlay {
+  background: rgba(6, 14, 10, 0.5);
+}
+
+.splash-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-card {
+  max-width: 80%;
+  width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: splashPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes splashPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(15px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.splash-logo-img {
+  max-width: 100%;
+  height: auto;
+  max-height: 60%;
+  object-fit: contain;
+  margin-bottom: 1rem;
+  border-radius: var(--r);
+  transition: transform 0.3s ease;
+}
+
+.splash-logo-img:hover {
+  transform: scale(1.015);
+}
+
+.splash-message-box {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 1.5rem;
+}
+
+.splash-message {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0;
+  font-weight: 400;
+}
+
+.splash-message strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.splash-message a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1.5px dashed var(--primary-dim);
+  transition: all 0.2s ease;
+}
+
+.splash-message a:hover {
+  color: var(--primary-lt);
+  border-bottom-style: solid;
+  border-bottom-color: var(--primary-lt);
+}
+
+.splash-action-btn {
+  font-size: 1.1rem;
+  padding: 0.8rem 3.5rem;
+  border-radius: 50px;
+  min-width: 180px;
+  cursor: pointer;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────── */
+.app-footer {
+  height: var(--ftr);
+  background: var(--hdr-bg);
+  border-top: 1px solid var(--hdr-border);
+  color: var(--hdr-text);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 800;
+  box-sizing: border-box;
+}
+
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 1.25rem;
+  box-sizing: border-box;
+}
+
+.footer-copyright {
+  text-align: center;
+}
+
+.footer-copyright a {
+  color: var(--hdr-text);
+  text-decoration: none;
+  font-weight: 600;
+  opacity: 0.95;
+  transition: opacity 0.15s;
+}
+
+.footer-copyright a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.footer-icons {
+  position: absolute;
+  right: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.footer-icon-link {
+  color: var(--hdr-text);
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.15s;
+  display: inline-flex;
+  align-items: center;
+}
+
+.footer-icon-link:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.footer-icon-link svg {
+  display: block;
+}
+
+@media (max-width: 500px) {
+  .app-footer {
+    height: auto;
+    padding: 0.6rem 1rem;
+  }
+  .footer-content {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .footer-icons {
+    position: static;
+    transform: none;
+    justify-content: center;
+  }
+}
+
+.splash-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  z-index: 10001;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .splash-progress-bar {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.splash-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  width: 100%;
+  animation: splashProgress 5s linear forwards;
+}
+
+@keyframes splashProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* ── View Toggle segment ────────────────────────────────────────── */
+.view-toggle {
+  display: inline-flex;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 2px;
+  gap: 2px;
+}
+.view-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.35rem 0.85rem;
+  border-radius: calc(var(--r) - 2px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.view-btn:hover {
+  color: var(--text);
+}
+.view-btn.active {
+  background: var(--primary);
+  color: var(--text-inv);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Preview Monthly Table ──────────────────────────────────────── */
+.prev-table-wrap {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  margin-top: 1rem;
+}
+
+[data-theme="dark"] .prev-table-wrap {
+  background: var(--surf2);
+}
+
+.prev-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+  font-family: var(--font);
+}
+
+.prev-table th, .prev-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.prev-table th {
+  background: var(--surf2);
+  color: var(--text);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+[data-theme="dark"] .prev-table th {
+  background: var(--bg);
+}
+
+.prev-table th .ar-col {
+  font-family: var(--ar);
+  font-size: 1.15rem;
+  color: var(--muted);
+  margin-left: 0.25rem;
+}
+
+.prev-table tbody tr:hover {
+  background: var(--primary-glow);
+}
+
+.prev-table tbody tr.today {
+  background: var(--primary-dim);
+  font-weight: 500;
+}
+
+.prev-table tbody tr.today td {
+  border-bottom-color: var(--primary);
+  color: var(--primary);
+}
+
+.prev-table td strong {
+  font-size: 0.95rem;
+}
+
+.hijri-date-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  direction: ltr;
+}
+.hijri-date-cell .hijri-yr {
+  color: var(--text);
+  font-weight: 500;
+}
+.hijri-date-cell .hijri-er {
+  font-family: var(--ar);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.hijri-date-cell .hijri-mo {
+  font-family: var(--ar);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0 0.1rem;
+}
+.hijri-date-cell .hijri-dy {
+  color: var(--text);
+  font-weight: 600;
+}
+
 </style>
 </head>
 <body>
 
+<!-- ── Splash Screen Overlay ─────────────────────────────────────── -->
+<div id="splash-screen" class="splash-overlay" onclick="dismissSplash()">
+  <div class="splash-card">
+    <img src="assets/splash3.png" alt="Salah Calendar Splash" class="splash-logo-img">
+    <div class="splash-message-box">
+      <p class="splash-message">
+        That this app is made for free by <a href="https://getxpert.com" target="_blank" rel="noopener noreferrer"><strong>getxpert ltd</strong></a> - for any feedback and support please email <a href="mailto:contact@hablullah.app">contact@hablullah.app</a> or whatsapp <a href="https://wa.me/442036338505" target="_blank" rel="noopener noreferrer">+44 203 6338505</a>
+        <br>
+        <span style="display:block; margin-top:1.2rem; font-size:0.85rem; color:var(--muted); opacity:0.8; letter-spacing:0.05em; text-transform:uppercase;">(Click anywhere to start)</span>
+      </p>
+    </div>
+    <div class="splash-progress-bar">
+      <div class="splash-progress-fill"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Header ───────────────────────────────────────────────────── -->
 <header class="hdr">
-  <div class="brand">
+  <div class="brand" onclick="showSplash()" title="Show Splash Screen">
     <img src="assets/icon.png" alt="SalahCalendar" class="brand-icon">
     <span class="brand-name">SalahCalendar</span>
     <div class="app-version">
-      <span class="v-num">v2.1.2</span>
-      <span class="v-date">Compiled: 13 Jun 2026</span>
+      <span class="v-num">v1.2.1</span>
+      <span class="v-date">Compiled: 20 Jun 2026</span>
     </div>
   </div>
   <div class="hdr-sep"></div>
@@ -708,8 +1128,7 @@ select.inp {
           <div class="acct-email">Welcome to Salah Calendar</div>
           <div class="acct-meta">Sign in to manage your calendars</div>
         </div>
-        <button class="acct-menu-item" onclick="showAuthModal('otp')">🔑 Sign in with OTP</button>
-        <button class="acct-menu-item" onclick="showAuthModal('link')">🔗 Sign in via Email Link</button>
+        <button class="acct-menu-item" onclick="showAuthModal()">🔑 Sign In</button>
       </div>
       <!-- Signed-in state -->
       <div id="acct-signed-in" style="display:none;">
@@ -883,10 +1302,15 @@ select.inp {
       <div class="prev-panel" id="prev-panel">
         <div class="prev-topbar">
           <span class="prev-title">Prayer Times Preview</span>
+          <div class="view-toggle">
+            <button class="view-btn active" id="view-btn-weekly" onclick="setViewMode('weekly')">Weekly</button>
+            <button class="view-btn" id="view-btn-monthly" onclick="setViewMode('monthly')">Monthly</button>
+            <button class="view-btn" id="view-btn-hijri" onclick="setViewMode('hijri')">Hijri Monthly</button>
+          </div>
           <div class="prev-nav">
-            <button class="nav-btn" onclick="shiftWk(-1)">← Prev</button>
+            <button class="nav-btn" onclick="shiftPeriod(-1)">← Prev</button>
             <span class="prev-period" id="prev-period">—</span>
-            <button class="nav-btn" onclick="shiftWk(1)">Next →</button>
+            <button class="nav-btn" onclick="shiftPeriod(1)">Next →</button>
           </div>
         </div>
         <div class="tz-bar">Times for timezone: <span id="tz-label">—</span></div>
@@ -1014,6 +1438,32 @@ select.inp {
         </div>
       </div>
     </div>
+
+    <!-- ── Footer ───────────────────────────────────────────────────── -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <div class="footer-copyright">
+          Copyright &copy; 2026 <a href="https://getxpert.com" target="_blank" rel="noopener noreferrer">getxpert.com</a>
+        </div>
+        <div class="footer-icons">
+          <a href="mailto:contact@hablullah.app" title="Email Feedback" class="footer-icon-link">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+            </svg>
+          </a>
+          <a href="https://www.youtube.com/@getxpert" target="_blank" rel="noopener noreferrer" title="YouTube Channel" class="footer-icon-link">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.108C19.525 3.5 12 3.5 12 3.5s-7.525 0-9.388.555a3.002 3.002 0 0 0-2.11 2.108C0 8.028 0 12 0 12s0 3.972.502 5.837a3.003 3.003 0 0 0 2.11 2.108C4.475 20.5 12 20.5 12 20.5s7.525 0 9.388-.555a3.002 3.002 0 0 0 2.11-2.108C24 15.972 24 12 24 12s0-3.972-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+            </svg>
+          </a>
+          <a href="https://wa.me/442036338505" target="_blank" rel="noopener noreferrer" title="WhatsApp Support" class="footer-icon-link">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.733-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.967C16.59 1.973 14.113.95 11.49.95c-5.447 0-9.876 4.372-9.88 9.8.002 2.01.523 3.978 1.517 5.727L2.1 20.3l4.033-1.054c-.163-.092-.325-.19-.485-.292zM17.35 14.39c-.29-.145-1.716-.848-1.982-.945-.266-.096-.46-.145-.653.145-.193.29-.747.945-.916 1.139-.17.194-.338.218-.628.073-1.72-.86-2.852-1.526-3.83-3.2-.26-.445.26-.413.743-1.378.08-.163.04-.306-.02-.45-.06-.145-.533-1.285-.73-1.76-.192-.464-.388-.4-.533-.408-.137-.008-.293-.01-.45-.01-.157 0-.413.06-.63.29-.217.23-.827.81-.827 1.97 0 1.16.84 2.28.956 2.43.116.15 1.66 2.53 4.022 3.55 1.057.457 1.865.73 2.5.932.808.257 1.543.22 2.124.133.647-.096 1.716-.701 1.957-1.378.24-.678.24-1.258.17-1.378-.073-.12-.266-.193-.556-.34z"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </footer>
 
     <!-- ═══ OTP MODAL ═══ -->
     <div id="otp-overlay" class="otp-overlay" style="display:none;">
@@ -1146,6 +1596,36 @@ select.inp {
 
 <script>
 /* ================================================================
+   Splash Screen Overlay
+================================================================ */
+let splashTimer = setTimeout(dismissSplash, 5000);
+
+function dismissSplash() {
+  if (splashTimer) {
+    clearTimeout(splashTimer);
+    splashTimer = null;
+  }
+  const splash = document.getElementById('splash-screen');
+  if (splash) {
+    splash.classList.add('hidden');
+  }
+}
+function showSplash() {
+  if (splashTimer) {
+    clearTimeout(splashTimer);
+    splashTimer = null;
+  }
+  const splash = document.getElementById('splash-screen');
+  if (splash) {
+    const progressBar = splash.querySelector('.splash-progress-bar');
+    if (progressBar) {
+      progressBar.style.display = 'none';
+    }
+    splash.classList.remove('hidden');
+  }
+}
+
+/* ================================================================
    Theme Toggle
 ================================================================ */
 function getTheme(){ return localStorage.getItem('sc-theme')||'light'; }
@@ -1204,14 +1684,6 @@ function clearSession() {
 }
 
 async function checkSessionOnLoad() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const resetToken = urlParams.get('reset_token');
-  if (resetToken) {
-    showAuthModal('pwd');
-    authPwdMode = 'reset';
-    updatePwdUI();
-  }
-
   const token = getSessionToken();
   if (!token) {
     updateAccountUI();
@@ -1227,15 +1699,6 @@ async function checkSessionOnLoad() {
       authenticatedEmail = data.user.email;
       const sessionData = getSessionData();
       setSessionToken(sessionData.token, sessionData.expires_at, data.user.email, data.user.name, data.calendar_count);
-      
-      if (activeTab === 'feed') {
-        const dynEmailEl = document.getElementById('dyn-email');
-        if (dynEmailEl) {
-          dynEmailEl.value = data.user.email;
-          dynEmailEl.readOnly = true;
-          loadUserCalendarsForDynForm();
-        }
-      }
     } else {
       clearSession();
     }
@@ -1486,6 +1949,7 @@ async function submitAuthRequest(fd) {
     authenticatedEmail = data.user.email;
     closeAuthModal();
     if (activeTab === 'feed') {
+      setupDynFormForAuthenticatedUser();
       await loadUserCalendarsForDynForm();
     }
   } catch(e) {
@@ -1567,6 +2031,7 @@ async function authVerifyOTP() {
     closeAuthModal();
 
     if (activeTab === 'feed') {
+      setupDynFormForAuthenticatedUser();
       await loadUserCalendarsForDynForm();
     }
   } catch(e) {
@@ -1652,6 +2117,16 @@ function updateDynSubmitState() {
   } else {
     btn.disabled = !validEmail || !dynCalendarKeyValid;
   }
+}
+
+/* Helper: transitions the dyn form into "authenticated" mode */
+function setupDynFormForAuthenticatedUser() {
+  const dynEmailEl = document.getElementById('dyn-email');
+  if (dynEmailEl) {
+    dynEmailEl.value = authenticatedEmail;
+    dynEmailEl.readOnly = true;
+  }
+  document.getElementById('dyn-email-next-wrap').style.display = 'none';
 }
 
 async function loadUserCalendarsForDynForm() {
@@ -1980,7 +2455,10 @@ const DM={
 const S = {
   lat:null, lng:null, name:'', city:'', country:'',
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
-  prevWk:0
+  prevWk:0,
+  prevViewMode:'weekly',
+  prevMonthOffset:0,
+  prevHijriMonthOffset:0
 };
 const PI = {
   imsak:{key:'imsak',en:'Imsak',ar:'الإمساك'},
@@ -2271,10 +2749,102 @@ function fmtMn(mn){ const t=((Math.round(mn)%1440)+1440)%1440; return `${String(
 /* ================================================================
    Preview
 ================================================================ */
-function shiftWk(d){ S.prevWk+=d; renderPrev(); }
+function getHijriPartsForDate(date, tz) {
+  const fmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
+    timeZone: tz,
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric'
+  });
+  const parts = fmt.formatToParts(date);
+  let hd = 0, hm = 0, hy = 0;
+  parts.forEach(p => {
+    if (p.type === 'day') hd = parseInt(p.value, 10);
+    else if (p.type === 'month') hm = parseInt(p.value, 10);
+    else if (p.type === 'year') hy = parseInt(p.value, 10);
+  });
+  
+  const fmtLong = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', {
+    timeZone: tz,
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+  const partsLong = fmtLong.formatToParts(date);
+  let hMonthName = '', hEra = 'هـ';
+  partsLong.forEach(p => {
+    if (p.type === 'month') hMonthName = p.value;
+    else if (p.type === 'era') hEra = p.value;
+  });
+  
+  return { hd, hm, hy, hMonthName, hEra };
+}
+
+function find1stOfHijriMonth(today, offset, tz) {
+  const todayParts = getHijriPartsForDate(today, tz);
+  const Y_today = todayParts.hy;
+  const M_today = todayParts.hm;
+  const D_today = todayParts.hd;
+
+  let Y_target = Y_today;
+  let M_target = M_today + offset;
+  while (M_target < 1) {
+    M_target += 12;
+    Y_target -= 1;
+  }
+  while (M_target > 12) {
+    M_target -= 12;
+    Y_target += 1;
+  }
+
+  const diff_months = (Y_target - Y_today) * 12 + (M_target - M_today);
+  const approx_days = Math.round(diff_months * 29.53) - (D_today - 1);
+  
+  const testDate = new Date(today);
+  testDate.setDate(today.getDate() + approx_days);
+
+  let safety = 0;
+  while (safety < 50) {
+    const p = getHijriPartsForDate(testDate, tz);
+    const isBefore = (p.hy < Y_target) || (p.hy === Y_target && p.hm < M_target);
+    const isAfter = (p.hy > Y_target) || (p.hy === Y_target && p.hm > M_target) || (p.hy === Y_target && p.hm === M_target && p.hd > 1);
+
+    if (!isBefore && !isAfter) {
+      break;
+    } else if (isBefore) {
+      testDate.setDate(testDate.getDate() + 1);
+    } else {
+      testDate.setDate(testDate.getDate() - 1);
+    }
+    safety++;
+  }
+  return testDate;
+}
+
+function setViewMode(mode) {
+  S.prevViewMode = mode;
+  document.getElementById('view-btn-weekly').classList.toggle('active', mode === 'weekly');
+  document.getElementById('view-btn-monthly').classList.toggle('active', mode === 'monthly');
+  document.getElementById('view-btn-hijri').classList.toggle('active', mode === 'hijri');
+  renderPrev();
+}
+function shiftPeriod(d) {
+  if (S.prevViewMode === 'weekly') {
+    S.prevWk += d;
+  } else if (S.prevViewMode === 'monthly') {
+    S.prevMonthOffset += d;
+  } else if (S.prevViewMode === 'hijri') {
+    S.prevHijriMonthOffset += d;
+  }
+  renderPrev();
+}
 function renderPrev(){
   const grid=document.getElementById('prev-grid');
-  if(!S.lat||!S.lng){ grid.innerHTML='<div class="empty-state">Select a location to preview prayer times.</div>'; return; }
+  if(!S.lat||!S.lng){
+    grid.style.display='block';
+    grid.innerHTML='<div class="empty-state">Select a location to preview prayer times.</div>';
+    return;
+  }
   
   const tz=document.getElementById('tz-in').value.trim()||S.tz;
   const method=document.getElementById('method').value;
@@ -2282,40 +2852,220 @@ function renderPrev(){
   const before=parseInt(document.getElementById('sl-before').value);
   const after=parseInt(document.getElementById('sl-after').value);
   const keys=Object.keys(PI).filter(p=>{ const c=document.getElementById(`cb-${p}`); return c&&c.checked; });
-  document.getElementById('tz-label').textContent=tz;
+  const tzSelect = document.getElementById('tz-in');
+  const tzText = tzSelect.options[tzSelect.selectedIndex]?.text || tz;
+  document.getElementById('tz-label').textContent = tzText;
   const today=new Date(); today.setHours(0,0,0,0);
-  const dow=today.getDay(), monOff=dow===0?-6:1-dow;
-  const ws=new Date(today); ws.setDate(today.getDate()+monOff+S.prevWk*7);
-  const we=new Date(ws); we.setDate(ws.getDate()+6);
-  const fd=dt=>dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-  document.getElementById('prev-period').textContent=`${fd(ws)} – ${fd(we)} ${we.getFullYear()}`;
   const calc=new PrayTimes(method); calc.adjust({asr:asr});
-  grid.innerHTML='';
   
-  const todayStr=today.toDateString();
-  for(let i=0;i<7;i++){
-    const dt=new Date(ws); dt.setDate(ws.getDate()+i);
-    const y=dt.getFullYear(),mo=dt.getMonth()+1,d=dt.getDate();
-    const isToday=dt.toDateString()===todayStr;
-    const off=getTzOff(tz,y,mo,d);
-    const times=calc.getTimes([y,mo,d],[S.lat,S.lng,0],off,0,'Float');
-    const el=document.createElement('div');
-    el.className='p-day'+(isToday?' today':'');
-    el.innerHTML=`<div class="day-hdr">
-      <div class="day-wd">${dt.toLocaleDateString('en-GB',{weekday:'short'})}</div>
-      <div class="day-d">${d} ${dt.toLocaleDateString('en-GB',{month:'short'})}</div>
-      ${isToday?'<div class="today-tag">Today</div>':''}
-    </div>`;
-    keys.forEach(k=>{
-      const p=PI[k]; const ft=times[p.key]; if(!isFinite(ft)) return;
-      const am=ft*60, sm=am-before, em=am+after;
-      const row=document.createElement('div'); row.className='pr-row';
-      row.innerHTML=`<div class="pr-names"><span class="pr-en">${p.en}</span><span class="pr-ar">${p.ar}</span></div>
-        <span class="pr-time">${fmtFH(ft)}</span>
-        <span class="pr-win">${fmtMn(sm)} – ${fmtMn(em)}</span>`;
-      el.appendChild(row);
+  if (S.prevViewMode === 'weekly') {
+    grid.style.display = '';
+    const dow=today.getDay(), monOff=dow===0?-6:1-dow;
+    const ws=new Date(today); ws.setDate(today.getDate()+monOff+S.prevWk*7);
+    const we=new Date(ws); we.setDate(ws.getDate()+6);
+    const fd=dt=>dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    document.getElementById('prev-period').textContent=`${fd(ws)} – ${fd(we)} ${we.getFullYear()}`;
+    grid.innerHTML='';
+    
+    const todayStr=today.toDateString();
+    for(let i=0;i<7;i++){
+      const dt=new Date(ws); dt.setDate(ws.getDate()+i);
+      const y=dt.getFullYear(),mo=dt.getMonth()+1,d=dt.getDate();
+      const isToday=dt.toDateString()===todayStr;
+      const off=getTzOff(tz,y,mo,d);
+      const times=calc.getTimes([y,mo,d],[S.lat,S.lng,0],off,0,'Float');
+      
+      const arWeekday = dt.toLocaleDateString('ar-SA', { timeZone: tz, weekday: 'long' });
+      const p_hijri = getHijriPartsForDate(dt, tz);
+      const hDay = p_hijri.hd;
+      const hMonth = p_hijri.hMonthName;
+      
+      const el=document.createElement('div');
+      el.className='p-day'+(isToday?' today':'');
+      el.innerHTML=`<div class="day-hdr">
+        <div class="day-hdr-left">
+          <div class="day-wd">${dt.toLocaleDateString('en-GB',{weekday:'short'})}</div>
+          <div class="day-d">${d} ${dt.toLocaleDateString('en-GB',{month:'short'})}</div>
+        </div>
+        <div class="day-hdr-right">
+          <div class="day-ar-wd">${arWeekday}</div>
+          <div class="day-ar-hijri"><span>${hMonth}</span><span>${hDay}</span></div>
+        </div>
+      </div>
+      ${isToday?'<div class="today-tag" style="margin-top: -0.5rem; margin-bottom: 0.8rem;">Today</div>':''}`;
+      keys.forEach(k=>{
+        const p=PI[k]; const ft=times[p.key]; if(!isFinite(ft)) return;
+        const am=ft*60, sm=am-before, em=am+after;
+        const row=document.createElement('div'); row.className='pr-row';
+        row.innerHTML=`<div class="pr-names"><span class="pr-en">${p.en}</span><span class="pr-ar">${p.ar}</span></div>
+          <span class="pr-time">${fmtFH(ft)}</span>
+          <span class="pr-win">${fmtMn(sm)} – ${fmtMn(em)}</span>`;
+        el.appendChild(row);
+      });
+      grid.appendChild(el);
+    }
+  } else if (S.prevViewMode === 'monthly') {
+    grid.style.display = 'block';
+    const targetDate = new Date(today.getFullYear(), today.getMonth() + S.prevMonthOffset, 1);
+    const y = targetDate.getFullYear();
+    const mo = targetDate.getMonth();
+    
+    const monthName = targetDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    document.getElementById('prev-period').textContent = monthName;
+    
+    const totalDays = new Date(y, mo + 1, 0).getDate();
+    let html = `<div class="prev-table-wrap">
+      <table class="prev-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Day</th>
+            <th>Hijri Date</th>`;
+    
+    keys.forEach(k => {
+      const p = PI[k];
+      html += `<th>${p.en} <span class="ar-col">${p.ar}</span></th>`;
     });
-    grid.appendChild(el);
+    
+    html += `   </tr>
+        </thead>
+        <tbody>`;
+        
+    for (let d = 1; d <= totalDays; d++) {
+      const dt = new Date(Date.UTC(y, mo, d, 12, 0, 0));
+      const isToday = (y === today.getFullYear() && mo === today.getMonth() && d === today.getDate());
+      const off = getTzOff(tz, y, mo + 1, d);
+      const times = calc.getTimes([y, mo + 1, d], [S.lat, S.lng, 0], off, 0, 'Float');
+      
+      const dateStr = dt.toLocaleDateString('en-GB', { timeZone: tz, day: '2-digit', month: 'short', year: '2-digit' });
+      const weekdayStr = dt.toLocaleDateString('en-GB', { timeZone: tz, weekday: 'short' });
+      
+      const p_hijri = getHijriPartsForDate(dt, tz);
+      const hDay = p_hijri.hd;
+      const hMonth = p_hijri.hMonthName;
+      const hYear = p_hijri.hy;
+      const hEra = p_hijri.hEra;
+      
+      const hijriHtml = `<div class="hijri-date-cell">
+        <span class="hijri-er">${hEra}</span>
+        <span class="hijri-yr">${hYear}</span>
+        <span class="hijri-mo">${hMonth}</span>
+        <span class="hijri-dy">${hDay}</span>
+      </div>`;
+
+      html += `<tr class="${isToday ? 'today' : ''}">
+        <td><strong>${dateStr}</strong></td>
+        <td>${weekdayStr}</td>
+        <td>${hijriHtml}</td>`;
+        
+      keys.forEach(k => {
+        const p = PI[k];
+        const ft = times[p.key];
+        if (!isFinite(ft)) {
+          html += `<td>—</td>`;
+        } else {
+          html += `<td>${fmtFH(ft)}</td>`;
+        }
+      });
+      
+      html += `</tr>`;
+    }
+    
+    html += `   </tbody>
+      </table>
+    </div>`;
+    
+    grid.innerHTML = html;
+  } else if (S.prevViewMode === 'hijri') {
+    grid.style.display = 'block';
+    
+    // Find start of target Hijri Month (1st)
+    const start_date = find1stOfHijriMonth(today, S.prevHijriMonthOffset, tz);
+    const startParts = getHijriPartsForDate(start_date, tz);
+    const M_target = startParts.hm;
+    const Y_target = startParts.hy;
+    
+    // Format Month Header (e.g. "Muharram / محرم 1448 هـ")
+    const enFmt = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura-nu-latn', { timeZone: tz, month: 'long' });
+    const enMonth = enFmt.format(start_date);
+    
+    const arFmt = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-latn', { timeZone: tz, month: 'long', year: 'numeric' });
+    const arMonthAndYear = arFmt.format(start_date);
+    
+    document.getElementById('prev-period').textContent = `${enMonth} / ${arMonthAndYear}`;
+    
+    let html = `<div class="prev-table-wrap">
+      <table class="prev-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Day</th>
+            <th>Hijri Date</th>`;
+    
+    keys.forEach(k => {
+      const p = PI[k];
+      html += `<th>${p.en} <span class="ar-col">${p.ar}</span></th>`;
+    });
+    
+    html += `   </tr>
+        </thead>
+        <tbody>`;
+        
+    for (let d = 1; d <= 30; d++) {
+      const dt = new Date(start_date);
+      dt.setDate(start_date.getDate() + (d - 1));
+      
+      const p = getHijriPartsForDate(dt, tz);
+      if (p.hm !== M_target) {
+        break; // Crossed into the next Hijri month!
+      }
+      
+      const y_greg = dt.getFullYear();
+      const m_greg = dt.getMonth(); // 0-indexed
+      const d_greg = dt.getDate();
+      
+      const isToday = (y_greg === today.getFullYear() && m_greg === today.getMonth() && d_greg === today.getDate());
+      const off = getTzOff(tz, y_greg, m_greg + 1, d_greg);
+      const times = calc.getTimes([y_greg, m_greg + 1, d_greg], [S.lat, S.lng, 0], off, 0, 'Float');
+      
+      const dateStr = dt.toLocaleDateString('en-GB', { timeZone: tz, day: '2-digit', month: 'short', year: '2-digit' });
+      const weekdayStr = dt.toLocaleDateString('en-GB', { timeZone: tz, weekday: 'short' });
+      
+      const hDay = p.hd;
+      const hMonth = p.hMonthName;
+      const hYear = p.hy;
+      const hEra = p.hEra;
+      
+      const hijriHtml = `<div class="hijri-date-cell">
+        <span class="hijri-er">${hEra}</span>
+        <span class="hijri-yr">${hYear}</span>
+        <span class="hijri-mo">${hMonth}</span>
+        <span class="hijri-dy">${hDay}</span>
+      </div>`;
+
+      html += `<tr class="${isToday ? 'today' : ''}">
+        <td><strong>${dateStr}</strong></td>
+        <td>${weekdayStr}</td>
+        <td>${hijriHtml}</td>`;
+        
+      keys.forEach(k => {
+        const p = PI[k];
+        const ft = times[p.key];
+        if (!isFinite(ft)) {
+          html += `<td>—</td>`;
+        } else {
+          html += `<td>${fmtFH(ft)}</td>`;
+        }
+      });
+      
+      html += `</tr>`;
+    }
+    
+    html += `   </tbody>
+      </table>
+    </div>`;
+    
+    grid.innerHTML = html;
   }
 }
 
@@ -2397,6 +3147,12 @@ function renderFeed() {
   if (!currentCalendarKey) {
     currentCalendarKey = generateCalendarKey();
     document.getElementById('dyn-calkey').value = currentCalendarKey;
+  }
+
+  // If user is already signed in, skip email entry and go straight to calendar selection
+  if (isAuthenticated && getSessionToken()) {
+    setupDynFormForAuthenticatedUser();
+    loadUserCalendarsForDynForm();
   }
 
   // Build static URLs

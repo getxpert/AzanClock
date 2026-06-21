@@ -218,7 +218,7 @@ function actionRegister() {
 
     // ── Build dynamic link ───────────────────────────────────
     // User requirement: link MUST ONLY contain the calendar id and NOT the auth token
-    $dynamicLink = APP_BASE_URL . '/?cid=' . urlencode($calendarKey);
+    $dynamicLink = APP_BASE_URL . '/prayer.php?cid=' . urlencode($calendarKey);
     $calLink     = APP_BASE_URL . '/prayer.php?cid=' . urlencode($calendarKey);
     $webcalLink  = str_replace('https://', 'webcal://', $calLink);
 
@@ -431,7 +431,57 @@ function actionUpdateCalendar() {
     jsonOK(['calendar_key' => $calendarKey, 'updated' => true]);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   ACTION: get-user-calendars
+   Returns all calendars belonging to the authenticated user
+══════════════════════════════════════════════════════════════ */
+function actionGetUserCalendars() {
+    $session = validateSession();
+    if (!$session) {
+        jsonErr('Unauthorized: valid session required.', 401);
+    }
 
+    $db = getDB();
+    $stmt = $db->prepare(
+        'SELECT calendar_key, params, created_at, modified_at
+         FROM salah_calendars
+         WHERE user_id = ?
+         ORDER BY modified_at DESC'
+    );
+    $stmt->execute([$session['user_id']]);
+    $rows = $stmt->fetchAll();
+
+    $calendars = [];
+    foreach ($rows as $row) {
+        $params = json_decode($row['params'], true);
+        $calendars[] = [
+            'calendar_key'   => $row['calendar_key'],
+            'params'         => $params,
+            'params_summary' => $params['location'] ?? ($params['lat'] . ', ' . $params['lng']),
+            'created_at'     => $row['created_at'],
+            'modified_at'    => $row['modified_at'],
+        ];
+    }
+
+    jsonOK(['calendars' => $calendars]);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ACTION: check-calendar-key
+   Checks if a calendar key already exists
+══════════════════════════════════════════════════════════════ */
+function actionCheckCalendarKey() {
+    $key = isset($_POST['key']) ? trim($_POST['key']) :
+           (isset($_GET['key']) ? trim($_GET['key']) : '');
+    if ($key === '') jsonErr('Missing calendar key.');
+
+    $db = getDB();
+    $stmt = $db->prepare('SELECT id FROM salah_calendars WHERE calendar_key = ?');
+    $stmt->execute([$key]);
+    $exists = (bool)$stmt->fetch();
+
+    jsonOK(['exists' => $exists, 'available' => !$exists]);
+}
 
 /* ══════════════════════════════════════════════════════════════
    ACTION: delete-calendar
@@ -523,19 +573,6 @@ HTML;
 }
 
 
-
-/* ══════════════════════════════════════════════════════════════
-   ACTION: check-email
-   Checks if an email exists in the users table
-══════════════════════════════════════════════════════════════ */
-function actionCheckEmail() {
-    $email = strtolower(requirePost('email'));
-    $db = getDB();
-    $stmt = $db->prepare('SELECT id FROM users WHERE email = ?');
-    $stmt->execute([$email]);
-    $exists = (bool)$stmt->fetch();
-    jsonOK(['exists' => $exists]);
-}
 
 /* ══════════════════════════════════════════════════════════════
    Router

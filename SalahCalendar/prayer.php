@@ -672,7 +672,9 @@ while ($loop_date <= $loop_end) {
     $d = (int)$loop_date->format('j');
 
     // Timezone offset for this specific day (seconds → hours), respects DST
-    $tz_offset_hours = $timezone->getOffset($loop_date) / 3600;
+    // Evaluate offset at 12:00:00 noon local time to avoid early-morning DST transition points
+    $loop_noon = new DateTime($loop_date->format('Y-m-d') . ' 12:00:00', $timezone);
+    $tz_offset_hours = $timezone->getOffset($loop_noon) / 3600;
 
     $times = $prayTime->getTimes($y, $m, $d, $lat, $lng, $tz_offset_hours, $elv);
 
