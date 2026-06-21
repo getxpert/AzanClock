@@ -649,7 +649,7 @@ $method_label = $all_methods[$method]['name'] ?? $method;
 $location_label = $location_raw ?: "{$lat}, {$lng}";
 
 $cal_name = "Prayer Times · {$method_label}";
-$cal_desc = "Prayer times for {$location_label} | Method: {$method_label} | Timezone: {$tz_clean}";
+$cal_desc = "Prayer times for {$location_label} | Method: {$method_label} | Timezone: {$tz_clean} | Salah Calendar v1.2.1 | Compiled: 20 Jun 2026 | © 2026 Salah Calendar | contact@hablullah.app";
 
 $ical  = "BEGIN:VCALENDAR\r\n";
 $ical .= "VERSION:2.0\r\n";
@@ -719,6 +719,9 @@ while ($loop_date <= $loop_end) {
         if ($before > 0) $desc_parts[] = "{$before} min reminder before adhan";
         if ($after  > 0) $desc_parts[] = "{$after} min window after adhan";
         $desc_parts[] = "Method: {$method_label}";
+        $desc_parts[] = "Salah Calendar v1.2.1 (Compiled: 20 Jun 2026)";
+        $desc_parts[] = "© 2026 Salah Calendar. All rights reserved.";
+        $desc_parts[] = "Email: contact@hablullah.app";
         $desc = implode('\n', $desc_parts);
 
         $ical .= "BEGIN:VEVENT\r\n";

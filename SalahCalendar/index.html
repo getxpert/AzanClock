@@ -1083,7 +1083,52 @@ select.inp {
   font-weight: 600;
 }
 
+/* ── Export Dropdown ──────────────────────────────────────────────── */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  min-width: 140px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+[data-theme="dark"] .dropdown-menu {
+  background: var(--surf2);
+}
+.dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.6rem 1rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.15s ease;
+}
+.dropdown-item:hover {
+  background: var(--primary-glow);
+  color: var(--primary);
+}
+.dropdown-item + .dropdown-item {
+  border-top: 1px solid var(--border);
+}
+
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -1312,6 +1357,17 @@ select.inp {
             <span class="prev-period" id="prev-period">—</span>
             <button class="nav-btn" onclick="shiftPeriod(1)">Next →</button>
           </div>
+          <div class="dropdown">
+            <button class="nav-btn" id="export-btn" onclick="toggleExportDropdown(event)" style="display:flex; align-items:center; gap:4px;">
+              <span>Export</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div class="dropdown-menu" id="export-menu">
+              <button class="dropdown-item" onclick="exportAs('png')">Export PNG</button>
+              <button class="dropdown-item" onclick="exportAs('pdf')">Export PDF</button>
+              <button class="dropdown-item" onclick="exportAs('ics')">Export ICS</button>
+            </div>
+          </div>
         </div>
         <div class="tz-bar">Times for timezone: <span id="tz-label">—</span></div>
         <div class="prev-grid" id="prev-grid">
@@ -1443,9 +1499,14 @@ select.inp {
     <footer class="app-footer">
       <div class="footer-content">
         <div class="footer-copyright">
-          Copyright &copy; 2026 <a href="https://getxpert.com" target="_blank" rel="noopener noreferrer">getxpert.com</a>
+          Copyright &copy; 2026 <a href="https://getxpert.com" target="_blank" rel="noopener noreferrer">getXpert ltd</a>
         </div>
         <div class="footer-icons">
+          <a href="#" onclick="openContactModal(); return false;" title="Contact Us" class="footer-icon-link">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            </svg>
+          </a>
           <a href="mailto:contact@hablullah.app" title="Email Feedback" class="footer-icon-link">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
               <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
@@ -1464,6 +1525,63 @@ select.inp {
         </div>
       </div>
     </footer>
+
+    <!-- ═══ CONTACT MODAL ═══ -->
+    <div id="contact-overlay" class="auth-overlay" style="display:none;">
+      <div class="auth-modal">
+        <button class="auth-close" onclick="closeContactModal()" title="Close">✕</button>
+        <h3>✉️ Contact Us</h3>
+        <p class="auth-desc">We'd love to hear from you!</p>
+        
+        <div id="contact-success" class="auth-success"></div>
+        <div id="contact-error" class="auth-error"></div>
+
+        <form id="contact-form" class="dyn-form" onsubmit="submitContact(event)">
+          <div class="field-row">
+            <div class="field">
+              <label class="lbl">Name</label>
+              <input type="text" id="c-name" class="inp" placeholder="Optional">
+            </div>
+            <div class="field">
+              <label class="lbl">Email <span class="req">*</span></label>
+              <input type="email" id="c-email" class="inp" placeholder="your@email.com" required>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label class="lbl">Telephone</label>
+              <input type="tel" id="c-phone" class="inp" placeholder="Optional">
+            </div>
+            <div class="field">
+              <label class="lbl">Country</label>
+              <input type="text" id="c-country" class="inp" placeholder="Optional">
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl">Query Type</label>
+            <select id="c-type" class="inp">
+              <option value="Feedback">Feedback</option>
+              <option value="Complaint">Complaint</option>
+              <option value="Error report">Error report</option>
+              <option value="Support">Support</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="lbl">Subject <span class="req">*</span></label>
+            <input type="text" id="c-subject" class="inp" required>
+          </div>
+          <div class="field">
+            <label class="lbl">Message <span class="req">*</span></label>
+            <textarea id="c-message" class="inp" rows="4" required style="resize:vertical; padding: .6rem .85rem; border-radius: var(--r); border: 1px solid var(--border); background: var(--inp-bg); color: var(--text); font-family: var(--font); font-size: .9rem;"></textarea>
+          </div>
+          <button type="submit" id="btn-contact-submit" class="dyn-submit">
+            <span class="btn-text">Send Message</span>
+            <div class="spinner"></div>
+          </button>
+        </form>
+      </div>
+    </div>
 
     <!-- ═══ OTP MODAL ═══ -->
     <div id="otp-overlay" class="otp-overlay" style="display:none;">
@@ -3070,6 +3188,197 @@ function renderPrev(){
 }
 
 /* ================================================================
+   Export Functions (PNG, PDF, ICS)
+================================================================ */
+function toggleExportDropdown(event) {
+  event.stopPropagation();
+  const menu = document.getElementById('export-menu');
+  const isVisible = menu.style.display === 'block';
+  menu.style.display = isVisible ? 'none' : 'block';
+}
+
+// Close the dropdown when clicking outside
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('export-menu');
+  if (menu && menu.style.display === 'block') {
+    const btn = document.getElementById('export-btn');
+    if (!btn.contains(event.target) && !menu.contains(event.target)) {
+      menu.style.display = 'none';
+    }
+  }
+});
+
+function getPreviewRange() {
+  const today = new Date();
+  let startDate, endDate;
+  const tz = document.getElementById('tz-in').value.trim() || S.tz;
+  
+  if (S.prevViewMode === 'weekly') {
+    const dow = today.getDay(), monOff = dow === 0 ? -6 : 1 - dow;
+    const ws = new Date(today); ws.setHours(0,0,0,0);
+    ws.setDate(today.getDate() + monOff + S.prevWk * 7);
+    const we = new Date(ws); we.setDate(ws.getDate() + 6); we.setHours(23,59,59,999);
+    startDate = ws;
+    endDate = we;
+  } else if (S.prevViewMode === 'monthly') {
+    const targetDate = new Date(today.getFullYear(), today.getMonth() + S.prevMonthOffset, 1);
+    const y = targetDate.getFullYear();
+    const mo = targetDate.getMonth();
+    const totalDays = new Date(y, mo + 1, 0).getDate();
+    startDate = new Date(y, mo, 1, 0, 0, 0);
+    endDate = new Date(y, mo, totalDays, 23, 59, 59, 999);
+  } else if (S.prevViewMode === 'hijri') {
+    const start_date = find1stOfHijriMonth(today, S.prevHijriMonthOffset, tz);
+    const startParts = getHijriPartsForDate(start_date, tz);
+    const M_target = startParts.hm;
+    
+    startDate = new Date(start_date); startDate.setHours(0,0,0,0);
+    
+    let lastDate = new Date(start_date);
+    for (let d = 1; d <= 30; d++) {
+      const dt = new Date(start_date);
+      dt.setDate(start_date.getDate() + (d - 1));
+      const p = getHijriPartsForDate(dt, tz);
+      if (p.hm !== M_target) {
+        break;
+      }
+      lastDate = dt;
+    }
+    lastDate.setHours(23,59,59,999);
+    endDate = lastDate;
+  }
+  return { startDate, endDate };
+}
+
+function exportAs(format) {
+  // Hide dropdown
+  document.getElementById('export-menu').style.display = 'none';
+  
+  if (format === 'ics') {
+    const range = getPreviewRange();
+    const now = new Date();
+    
+    // Calculate hours_before and hours_after relative to now
+    const hours_before = Math.max(0, Math.ceil((now.getTime() - range.startDate.getTime()) / 3600000));
+    const hours_after = Math.max(0, Math.ceil((range.endDate.getTime() - now.getTime()) / 3600000));
+    
+    const params = gatherCalendarParams();
+    params.hours_before = hours_before;
+    params.hours_after = hours_after;
+    
+    const p = new URLSearchParams(params);
+    const localPrayerURL = window.location.href.replace('index.html','').replace(/\/$/,'') + '/prayer.php';
+    const link = document.createElement('a');
+    link.href = `${localPrayerURL}?${p}`;
+    link.click();
+  } else if (format === 'png' || format === 'pdf') {
+    const originalElement = document.getElementById('prev-grid');
+    if (!originalElement) return;
+    
+    // Create a temporary wrapper in the live DOM
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'absolute';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+    wrapper.style.width = '1200px';
+    wrapper.style.backgroundColor = getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#ffffff';
+    wrapper.style.padding = '20px 30px';
+    wrapper.style.boxSizing = 'border-box';
+    wrapper.style.fontFamily = 'var(--font)';
+    wrapper.style.color = 'var(--text)';
+    
+    // Header
+    const headerDiv = document.createElement('div');
+    headerDiv.style.display = 'flex';
+    headerDiv.style.alignItems = 'center';
+    headerDiv.style.justifyContent = 'space-between';
+    headerDiv.style.borderBottom = '2px solid var(--primary)';
+    headerDiv.style.paddingBottom = '12px';
+    headerDiv.style.marginBottom = '20px';
+    headerDiv.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">Salah Calendar</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; font-size: 0.85rem; color: var(--muted); line-height: 1.3;">
+        <span style="font-weight: 600; color: var(--primary);">v1.2.1</span>
+        <span>Compiled: 20 Jun 2026</span>
+      </div>
+    `;
+    wrapper.appendChild(headerDiv);
+    
+    // Clone grid
+    const elementClone = originalElement.cloneNode(true);
+    elementClone.removeAttribute('id');
+    elementClone.style.width = '100%';
+    elementClone.style.height = 'auto';
+    elementClone.style.minHeight = 'none';
+    elementClone.style.overflow = 'visible';
+    elementClone.style.flex = 'none';
+    
+    const clonedWrap = elementClone.querySelector('.prev-table-wrap');
+    if (clonedWrap) {
+      clonedWrap.style.width = '100%';
+      clonedWrap.style.height = 'auto';
+      clonedWrap.style.overflow = 'visible';
+      clonedWrap.style.flex = 'none';
+    }
+    
+    wrapper.appendChild(elementClone);
+    
+    // Footer
+    const footerDiv = document.createElement('div');
+    footerDiv.style.display = 'flex';
+    footerDiv.style.alignItems = 'center';
+    footerDiv.style.justifyContent = 'space-between';
+    footerDiv.style.borderTop = '1px solid var(--border)';
+    footerDiv.style.paddingTop = '12px';
+    footerDiv.style.marginTop = '20px';
+    footerDiv.style.fontSize = '0.85rem';
+    footerDiv.style.color = 'var(--muted)';
+    footerDiv.innerHTML = `
+      <span>&copy; 2026 Salah Calendar. All rights reserved.</span>
+      <span>Email: <a href="mailto:contact@hablullah.app" style="color: var(--primary); text-decoration: none;">contact@hablullah.app</a></span>
+    `;
+    wrapper.appendChild(footerDiv);
+    
+    document.body.appendChild(wrapper);
+    
+    html2canvas(wrapper, {
+      backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false
+    }).then(canvas => {
+      document.body.removeChild(wrapper);
+      
+      if (format === 'png') {
+        const link = document.createElement('a');
+        link.download = `${S.prevViewMode}-calendar.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      } else if (format === 'pdf') {
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        
+        const imgWidth = canvas.width / 2;
+        const imgHeight = canvas.height / 2;
+        
+        const orientation = imgWidth > imgHeight ? 'landscape' : 'portrait';
+        const pdf = new jsPDF(orientation, 'px', [imgWidth, imgHeight]);
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        pdf.save(`${S.prevViewMode}-calendar.pdf`);
+      }
+    }).catch(err => {
+      console.error("Export failed:", err);
+      if (document.body.contains(wrapper)) {
+        document.body.removeChild(wrapper);
+      }
+    });
+  }
+}
+
+/* ================================================================
    Feed — State & Config
 ================================================================ */
 const API_BASE = window.location.href.replace('index.html','').replace(/\/$/,'') + '/calendar_api.php';
@@ -3338,6 +3647,73 @@ function closeOTPModal() {
   document.getElementById('otp-overlay').style.display = 'none';
   if (otpCountdownInterval) clearInterval(otpCountdownInterval);
   if (otpResendCooldown) clearInterval(otpResendCooldown);
+}
+
+/* ================================================================
+   Contact Modal
+================================================================ */
+function openContactModal() {
+  document.getElementById('contact-form').reset();
+  document.getElementById('contact-form').style.display = '';
+  document.getElementById('contact-error').style.display = 'none';
+  document.getElementById('contact-success').style.display = 'none';
+  document.getElementById('btn-contact-submit').disabled = false;
+  document.getElementById('btn-contact-submit').classList.remove('loading');
+  document.getElementById('contact-overlay').style.display = 'flex';
+}
+
+function closeContactModal() {
+  document.getElementById('contact-overlay').style.display = 'none';
+}
+
+async function submitContact(e) {
+  e.preventDefault();
+  
+  const errDiv = document.getElementById('contact-error');
+  const succDiv = document.getElementById('contact-success');
+  const btn = document.getElementById('btn-contact-submit');
+  
+  errDiv.style.display = 'none';
+  succDiv.style.display = 'none';
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  const payload = {
+    name: document.getElementById('c-name').value,
+    email: document.getElementById('c-email').value,
+    phone: document.getElementById('c-phone').value,
+    country: document.getElementById('c-country').value,
+    type: document.getElementById('c-type').value,
+    subject: document.getElementById('c-subject').value,
+    message: document.getElementById('c-message').value
+  };
+  
+  try {
+    const res = await fetch('contact_api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    
+    const data = await res.json();
+    if (data.success) {
+      succDiv.textContent = data.message;
+      succDiv.style.display = 'block';
+      document.getElementById('contact-form').style.display = 'none';
+      setTimeout(() => {
+        closeContactModal();
+      }, 3000);
+    } else {
+      errDiv.textContent = data.message || 'An error occurred.';
+      errDiv.style.display = 'block';
+    }
+  } catch (error) {
+    errDiv.textContent = 'Network error. Please try again later.';
+    errDiv.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
 }
 
 function startOTPCountdown(seconds) {
